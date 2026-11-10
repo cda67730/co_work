@@ -1,0 +1,70 @@
+{
+  "project": "parent-qa",
+  "title": "家長提問小幫手",
+  "purpose": "家長在 LINE 提出的問題，先自動分類。行政類依園務規章擬好回覆草稿，教學與情緒類轉給班導處理。",
+  "target": "",
+  "nodes": [
+    {
+      "id": "parent_q", "type": "input", "label": "家長提問",
+      "description": "從 LINE 官方帳號收到的訊息",
+      "outputs": ["question", "class_name"]
+    },
+    {
+      "id": "classify", "type": "llm", "label": "問題分類",
+      "description": "把家長問題分成 行政／教學／情緒 三類",
+      "inputs": ["question"], "outputs": ["category"],
+      "config": { "model": "gemini-2.5-flash" },
+      "acceptance": [
+        { "id": "c1", "text": "「學費怎麼繳」要分到行政類" },
+        { "id": "c2", "text": "「孩子最近不想上學」要分到情緒類" },
+        { "id": "c3", "text": "無法判斷時回傳 other，不可亂猜" }
+      ]
+    },
+    {
+      "id": "route", "type": "condition", "label": "依分類分流",
+      "inputs": ["category"], "outputs": ["category"],
+      "config": { "rule": "category 為「行政」走規章查詢，其餘轉給班導" },
+      "acceptance": [{ "id": "r1", "text": "other 也要轉給班導，不可丟掉" }]
+    },
+    {
+      "id": "rules_kb", "type": "retrieve", "label": "查園務規章",
+      "inputs": ["question"], "outputs": ["passages"],
+      "config": { "source": "Drive／園務規章", "topK": 4 },
+      "acceptance": [{ "id": "k1", "text": "問學費時，前 4 筆中要包含收費辦法" }]
+    },
+    {
+      "id": "answer", "type": "llm", "label": "擬回覆草稿",
+      "description": "依規章內容，用溫和口吻回覆家長",
+      "inputs": ["question", "passages"], "outputs": ["draft"],
+      "acceptance": [
+        { "id": "a1", "text": "150 字以內" },
+        { "id": "a2", "text": "要註明依據的規章條文" },
+        { "id": "a3", "text": "規章裡找不到答案時，說明會請老師回覆，不可自行編造" }
+      ]
+    },
+    {
+      "id": "to_teacher", "type": "output", "label": "轉給班導",
+      "inputs": ["question", "class_name", "category"],
+      "config": { "format": "寫入 Sheet 待辦並通知班導" },
+      "acceptance": [{ "id": "t1", "text": "通知內容要包含家長原文與班級" }]
+    },
+    {
+      "id": "reply", "type": "output", "label": "回覆家長",
+      "inputs": ["draft"],
+      "config": { "format": "LINE 訊息草稿，由老師確認後送出" },
+      "acceptance": [{ "id": "p1", "text": "草稿不可自動送出，必須經過老師確認" }]
+    }
+  ],
+  "edges": [
+    { "from": "parent_q", "to": "classify" },
+    { "from": "classify", "to": "route" },
+    { "from": "route", "to": "rules_kb", "label": "行政" },
+    { "from": "route", "to": "to_teacher", "label": "教學／情緒／other" },
+    { "from": "rules_kb", "to": "answer" },
+    { "from": "answer", "to": "reply" }
+  ],
+  "decisions": [
+    "回覆一律由老師確認後才送出，AI 只擬草稿",
+    "情緒類先不通知主任（11/10 討論決定）"
+  ]
+}
