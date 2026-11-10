@@ -46,7 +46,53 @@ function setup() {
 
 /* ---------- 進入點 ---------- */
 function doGet(e) {
-  return handle_(e.parameter || {});
+  const q = e.parameter || {};
+  if (q.action) return handle_(q);
+  return HtmlService.createTemplateFromFile('Page').evaluate()
+    .setTitle('開發追蹤')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/* ---------- 平台頁面（同事用） ----------
+ * 同事的連結要用另一個部署：
+ *   執行身分：存取網頁應用程式的使用者
+ *   誰可以存取：任何擁有 Google 帳戶的使用者（或你的組織）
+ * 並把這份 Sheet 共用給同事（編輯者），才能回答問題。
+ * 在給 Agent 的「所有人」部署裡，下面這些函式會拒絕匿名使用者。
+ */
+function pageUser_() {
+  const active = Session.getActiveUser().getEmail();
+  const effective = Session.getEffectiveUser().getEmail();
+  if (!active || active !== effective) throw new Error('請用同事專用的連結開啟，並登入 Google 帳號。');
+  return active;
+}
+
+function pageProjects() {
+  pageUser_();
+  const latest = {};
+  rows_('specs').forEach(r => {
+    if (!latest[r.project] || Number(r.version) > Number(latest[r.project].version)) latest[r.project] = r;
+  });
+  return Object.values(latest).map(r => ({ project: r.project, title: r.title, version: Number(r.version) }));
+}
+
+function pageData(project) {
+  const user = pageUser_();
+  const spec = getSpec_({ project: project });
+  const events = rows_('events').filter(r => r.project === project).map(r => {
+    let artifacts = [];
+    try { artifacts = JSON.parse(r.artifacts || '[]'); } catch (err) {}
+    return Object.assign({}, r, { artifacts: artifacts });
+  });
+  const questions = rows_('questions').filter(r => r.project === project);
+  return { user: user, project: project, version: spec.version, title: spec.title, spec: spec.spec, events: events, questions: questions };
+}
+
+function pageAnswer(project, id, answer) {
+  const user = pageUser_();
+  if (!String(answer || '').trim()) throw new Error('回覆不能是空的。');
+  answer_({ id: id, answer: String(answer).trim(), actor: user });
+  return pageData(project);
 }
 
 function doPost(e) {

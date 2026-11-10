@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 版面：上方摘要列 → 左流程圖、右節點詳情 → 下方待回覆＋時間軸；手機改成單欄 */
+:root{
+  --bg:#f2f4f3; --panel:#ffffff; --ink:#1c2422; --muted:#5f6b67; --line:#d6dcda; --soft:#f7f9f8;
+  --accent:#1f6f5c; --accent-ink:#ffffff;
+  --s-todo:#8a948f; --s-working:#2f6fb8; --s-done:#2e8b57; --s-blocked:#c0392b; --s-review:#c28a00;
+  --sans:"Noto Sans TC",system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#141917; --panel:#1b2220; --ink:#e3e9e6; --muted:#97a39e; --line:#2c3633; --soft:#171d1b;
+  --accent:#5cc3a6; --accent-ink:#0f1513;
+  --s-todo:#7d8883; --s-working:#6ea6e6; --s-done:#5cc28a; --s-blocked:#ef7a6d; --s-review:#e6b84a;
+  color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.6 var(--sans)}
+button,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1280px;margin:0 auto;padding:16px;display:grid;gap:14px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+header h1{margin:0;font-size:20px;font-weight:700}
+.ver{font-family:var(--mono);font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:1px 6px}
+header .sp{flex:1}
+.who{font-size:12px;color:var(--muted)}
+select,.btn{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:5px 10px}
+.btn{cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:500}
+.btn:disabled{opacity:.5;cursor:default}
+
+.summary{display:flex;flex-wrap:wrap;gap:8px}
+.pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:3px 12px;font-size:13px}
+.pill b{font-variant-numeric:tabular-nums}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+.purpose{color:var(--muted);max-width:70ch;margin:0}
+
+.main{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;min-width:0}
+.card h2{margin:0;font-size:13px;letter-spacing:.06em;color:var(--muted);font-weight:700;padding:10px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+.card h2 .n{font-family:var(--mono);font-weight:500}
+.graph{overflow:auto;padding:12px}
+.graph svg{display:block}
+.graph .edge{fill:none;stroke:var(--muted);stroke-width:1.5}
+.graph .elbl{fill:var(--panel)}
+.graph .etxt{fill:var(--muted);font-size:12.5px;font-family:var(--sans)}
+.graph .node rect.box{fill:var(--panel);stroke:var(--line);stroke-width:1}
+.graph .node{cursor:pointer}
+.graph .node:hover rect.box{stroke:var(--accent)}
+.graph .node.sel rect.box{stroke:var(--accent);stroke-width:2.5}
+.graph .node .lb{fill:var(--ink);font-size:15px;font-weight:500;font-family:var(--sans)}
+.graph .node .st{font-size:12.5px;font-family:var(--sans)}
+.graph .node .q{fill:var(--s-review);font-size:12px;font-weight:700}
+
+.detail{padding:14px;display:grid;gap:12px;align-content:start}
+.detail .ttl{font-size:16px;font-weight:700;margin:0}
+.detail .id{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.status{display:inline-flex;align-items:center;gap:6px;font-weight:500}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:13px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;min-width:0;word-break:break-word}
+.sec h3{margin:0 0 6px;font-size:12px;color:var(--muted);letter-spacing:.06em}
+.acc{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.acc li{display:flex;gap:8px;font-size:13px}
+.acc .aid{font-family:var(--mono);font-size:11px;color:var(--muted);padding-top:2px}
+.latest{background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:13px}
+.arts{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:13px}
+.arts a{color:var(--accent);word-break:break-all}
+.arts .path{font-family:var(--mono);font-size:12px;word-break:break-all}
+.empty{color:var(--muted);font-size:13px}
+
+.bottom{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.qs,.tl{padding:6px 14px 14px;display:grid;gap:0}
+.q{padding:12px 0;border-bottom:1px solid var(--line);display:grid;gap:6px}
+.q:last-child{border-bottom:none}
+.q .meta{font-size:12px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap}
+.q .text{font-weight:500}
+.q textarea{width:100%;min-height:60px;resize:vertical;border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:var(--soft)}
+.q .row{display:flex;gap:8px;align-items:center;justify-content:flex-end}
+.q .ans{font-size:13px;background:var(--soft);border-radius:6px;padding:6px 10px}
+.tag{font-size:11px;border-radius:4px;padding:0 6px;border:1px solid var(--line)}
+.ev{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.ev:last-child{border-bottom:none}
+.ev .t{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.ev .body{min-width:0;font-size:13px}
+.ev .head{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ev .nd{font-weight:500}
+.ev .who2{font-size:11.5px;color:var(--muted)}
+.linkbtn{background:none;border:none;padding:0;color:var(--accent);cursor:pointer;font-size:12px}
+
+.banner{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--s-blocked);border-radius:6px;padding:12px 14px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:6px;font-size:13px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);padding:0 14px 10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+
+@media (max-width:900px){
+  .main,.bottom{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="title">開發追蹤</h1>
+    <span class="ver" id="ver" hidden></span>
+    <span class="sp"></span>
+    <select id="proj" aria-label="選擇專案" hidden></select>
+    <button class="btn" id="refresh">重新整理</button>
+    <span class="who" id="who"></span>
+  </header>
+
+  <div id="banner" class="banner" hidden></div>
+
+  <div id="content" hidden>
+    <div style="display:grid;gap:10px">
+      <p class="purpose" id="purpose"></p>
+      <div class="summary" id="summary"></div>
+    </div>
+
+    <div class="main" style="margin-top:14px">
+      <section class="card">
+        <h2>流程</h2>
+        <div class="graph" id="graph"></div>
+        <div class="legend" id="legend"></div>
+      </section>
+      <section class="card">
+        <h2>節點詳情</h2>
+        <div class="detail" id="detail"></div>
+      </section>
+    </div>
+
+    <div class="bottom" style="margin-top:14px">
+      <section class="card">
+        <h2>待回覆 <span class="n" id="qcount"></span></h2>
+        <div class="qs" id="qs"></div>
+      </section>
+      <section class="card">
+        <h2>開發紀錄 <button class="linkbtn" id="tlAll" hidden>顯示全部</button></h2>
+        <div class="tl" id="tl"></div>
+      </section>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const ST = {
+  todo:{zh:'未開始',c:'--s-todo'}, working:{zh:'進行中',c:'--s-working'}, done:{zh:'完成',c:'--s-done'},
+  blocked:{zh:'卡住',c:'--s-blocked'}, needs_review:{zh:'待確認',c:'--s-review'}
+};
+const TYPE_ZH = {input:'輸入',llm:'AI 判斷／生成',retrieve:'查資料',condition:'分流',tool:'程式處理',output:'輸出'};
+let data=null, sel=null, tlFilter=null, project=null;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=ts=>{ const d=new Date(ts); if(isNaN(d)) return ''; const p=n=>String(n).padStart(2,'0'); return `${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
+const who=a=>String(a||'').replace(/^agent:/,'AI · ').replace(/^agent$/,'AI').replace(/@.*/,'');
+
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,2200); }
+function banner(msg){ $('banner').textContent=msg; $('banner').hidden=false; }
+
+function run(fn,...args){
+  return new Promise((res,rej)=>google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e))[fn](...args));
+}
+
+/* ---------- 狀態 ---------- */
+function nodeStatus(id){
+  const evs=data.events.filter(e=>e.node===id);
+  return evs.length ? evs[evs.length-1] : null;
+}
+function openQ(id){ return data.questions.filter(q=>q.status==='open' && (!id || q.node===id)); }
+
+/* ---------- 版面 ---------- */
+function layout(spec){
+  const ids=spec.nodes.map(n=>n.id), layer={}; ids.forEach(i=>layer[i]=0);
+  for(let k=0;k<ids.length;k++) (spec.edges||[]).forEach(e=>{ if(layer[e.from]!=null&&layer[e.to]!=null&&layer[e.to]<layer[e.from]+1) layer[e.to]=layer[e.from]+1; });
+  const cols={}; spec.nodes.forEach(n=>{ (cols[layer[n.id]]=cols[layer[n.id]]||[]).push(n.id); });
+  const W=150,H=58,GX=56,GY=34,PX=16,PY=26,pos={};
+  const maxRows=Math.max(...Object.values(cols).map(c=>c.length));
+  Object.entries(cols).forEach(([l,c])=>{
+    const off=(maxRows-c.length)*(H+GY)/2;
+    c.forEach((id,i)=>pos[id]={x:PX+l*(W+GX),y:PY+off+i*(H+GY),w:W,h:H});
+  });
+  const cw=PX*2+Object.keys(cols).length*(W+GX)-GX, ch=PY+16+maxRows*(H+GY)-GY;
+  return {pos,cw,ch};
+}
+
+function renderGraph(){
+  const spec=data.spec, {pos,cw,ch}=layout(spec);
+  let s=`<svg viewBox="0 0 ${cw} ${ch}" style="width:100%;min-width:${Math.round(cw*0.72)}px;max-width:${cw}px;height:auto" role="img" aria-label="流程圖"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" style="fill:var(--muted)"/></marker></defs>`;
+  (spec.edges||[]).forEach(e=>{
+    const a=pos[e.from], b=pos[e.to]; if(!a||!b) return;
+    const x1=a.x+a.w, y1=a.y+a.h/2, x2=b.x-2, y2=b.y+b.h/2, dx=Math.max(30,(x2-x1)/2);
+    s+=`<path class="edge" d="M${x1},${y1} C${x1+dx},${y1} ${x2-dx},${y2} ${x2},${y2}" marker-end="url(#ar)"/>`;
+    if(e.label) s+=`<text class="etxt" x="${b.x+2}" y="${b.y-7}">${esc(e.label)} ▸</text>`;
+  });
+  spec.nodes.forEach(n=>{
+    const p=pos[n.id], ev=nodeStatus(n.id), st=ST[(ev&&ev.status)||'todo']||ST.todo, q=openQ(n.id).length;
+    s+=`<g class="node${sel===n.id?' sel':''}" data-id="${esc(n.id)}" tabindex="0" role="button" aria-label="${esc(n.label)}，${st.zh}">
+      <rect class="box" x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="7"/>
+      <rect x="${p.x}" y="${p.y}" width="6" height="${p.h}" rx="3" style="fill:var(${st.c})"/>
+      <text class="lb" x="${p.x+16}" y="${p.y+24}">${esc(n.label||n.id)}</text>
+      <circle cx="${p.x+20}" cy="${p.y+41}" r="4" style="fill:var(${st.c})"/>
+      <text class="st" x="${p.x+30}" y="${p.y+45}" style="fill:var(${st.c})">${st.zh}</text>
+      ${q?`<text class="q" x="${p.x+p.w-10}" y="${p.y+45}" text-anchor="end">${q} 個提問</text>`:''}
+    </g>`;
+  });
+  $('graph').innerHTML=s+'</svg>';
+  $('legend').innerHTML=Object.values(ST).map(v=>`<span><i class="dot" style="background:var(${v.c})"></i>${v.zh}</span>`).join('');
+}
+
+function renderSummary(){
+  const counts={}; data.spec.nodes.forEach(n=>{ const s=(nodeStatus(n.id)||{}).status||'todo'; counts[s]=(counts[s]||0)+1; });
+  const done=counts.done||0, total=data.spec.nodes.length;
+  $('summary').innerHTML=`<span class="pill">完成 <b>${done} / ${total}</b></span>`+
+    ['working','blocked','needs_review'].filter(k=>counts[k]).map(k=>`<span class="pill"><i class="dot" style="background:var(${ST[k].c})"></i>${ST[k].zh} <b>${counts[k]}</b></span>`).join('')+
+    (openQ().length?`<span class="pill"><i class="dot" style="background:var(--s-review)"></i>待回覆提問 <b>${openQ().length}</b></span>`:'');
+}
+
+function artHtml(list){
+  if(!list||!list.length) return '';
+  return `<ul class="arts">${list.map(a=>{
+    if(a.url) return `<li><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.name||a.path||a.url)}</a></li>`;
+    return `<li><span class="path">${esc(a.path||a.name||'')}</span></li>`;
+  }).join('')}</ul>`;
+}
+
+function renderDetail(){
+  const box=$('detail');
+  const n=data.spec.nodes.find(x=>x.id===sel);
+  if(!n){ box.innerHTML=`<p class="empty">點選流程圖上的節點，查看說明、驗收標準和開發進度。</p>`; return; }
+  const ev=nodeStatus(n.id), st=ST[(ev&&ev.status)||'todo']||ST.todo;
+  const outs=(data.spec.edges||[]).filter(e=>e.from===n.id).map(e=>{ const t=data.spec.nodes.find(x=>x.id===e.to); return (e.label?e.label+' → ':'')+(t?t.label:e.to); });
+  const cfg=Object.entries(n.config||{}).filter(([k,v])=>v!==''&&v!=null&&k!=='prompt'&&k!=='model');
+  const arts=data.events.filter(e=>e.node===n.id).flatMap(e=>e.artifacts||[]);
+  const seen=new Set(), uniq=arts.reverse().filter(a=>{ const k=a.url||a.path; if(seen.has(k)) return false; seen.add(k); return true; });
+  box.innerHTML=`
+    <div><p class="ttl">${esc(n.label||n.id)}</p><span class="id">${esc(n.id)} · ${TYPE_ZH[n.type]||n.type}</span></div>
+    <div class="status"><i class="dot" style="background:var(${st.c})"></i>${st.zh}${ev?`<span class="who2" style="color:var(--muted);font-weight:400;font-size:12px">　${fmt(ev.ts)}</span>`:''}</div>
+    ${ev&&ev.summary?`<div class="latest">${esc(ev.summary)}</div>`:''}
+    ${n.description?`<div class="sec"><h3>做什麼</h3><div>${esc(n.description)}</div></div>`:''}
+    ${(n.inputs&&n.inputs.length)||outs.length||cfg.length?`<dl class="kv">
+      ${n.inputs&&n.inputs.length?`<dt>需要</dt><dd>${n.inputs.map(esc).join('、')}</dd>`:''}
+      ${n.outputs&&n.outputs.length?`<dt>產出</dt><dd>${n.outputs.map(esc).join('、')}</dd>`:''}
+      ${cfg.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}
+      ${outs.length?`<dt>下一步</dt><dd>${outs.map(esc).join('<br>')}</dd>`:''}
+    </dl>`:''}
+    ${n.acceptance&&n.acceptance.length?`<div class="sec"><h3>驗收標準</h3><ul class="acc">${n.acceptance.map(a=>`<li><span class="aid">${esc(a.id)}</span><span>${esc(a.text)}</span></li>`).join('')}</ul></div>`:''}
+    ${uniq.length?`<div class="sec"><h3>產出物</h3>${artHtml(uniq)}</div>`:''}
+    <div><button class="linkbtn" id="showNodeTl">只看這個節點的紀錄</button></div>`;
+  $('showNodeTl').onclick=()=>{ tlFilter=n.id; renderTimeline(); $('tl').scrollIntoView({behavior:'smooth',block:'nearest'}); };
+}
+
+function renderQuestions(){
+  const label=id=>{ const n=data.spec.nodes.find(x=>x.id===id); return n?n.label:(id||'一般'); };
+  const open=openQ(), done=data.questions.filter(q=>q.status==='answered').slice(-5).reverse();
+  $('qcount').textContent=open.length?`(${open.length})`:'';
+  let h=open.map(q=>`<div class="q" data-q="${esc(q.id)}">
+      <div class="meta"><span class="tag">${esc(label(q.node))}</span><span>${esc(who(q.actor))}</span><span>${fmt(q.ts)}</span></div>
+      <div class="text">${esc(q.question)}</div>
+      <textarea id="ans_${esc(q.id)}" placeholder="在這裡回覆，AI 下次開工時會讀到"></textarea>
+      <div class="row"><button class="btn primary" data-ans="${esc(q.id)}">送出回覆</button></div>
+    </div>`).join('');
+  if(!open.length) h=`<p class="empty" style="padding-top:8px">目前沒有需要回覆的提問。</p>`;
+  if(done.length) h+=`<div class="sec" style="margin-top:12px"><h3>最近已回覆</h3>${done.map(q=>`<div class="q">
+      <div class="meta"><span class="tag">${esc(label(q.node))}</span><span>${fmt(q.answeredAt)}</span></div>
+      <div>${esc(q.question)}</div><div class="ans">${esc(q.answer)}<span class="who2" style="color:var(--muted)">　— ${esc(who(q.answeredBy))}</span></div></div>`).join('')}</div>`;
+  $('qs').innerHTML=h;
+  $('qs').querySelectorAll('[data-ans]').forEach(b=>b.onclick=async()=>{
+    const id=b.dataset.ans, ta=$('ans_'+id), text=ta.value.trim();
+    if(!text){ ta.focus(); toast('請先輸入回覆內容'); return; }
+    b.disabled=true; b.textContent='送出中…';
+    try{ data=await run('pageAnswer',project,id,text); renderAll(); toast('已送出回覆'); }
+    catch(e){ b.disabled=false; b.textContent='送出回覆'; toast((e&&e.message)||'送出失敗，請再試一次'); }
+  });
+}
+
+function renderTimeline(){
+  const label=id=>{ const n=data.spec.nodes.find(x=>x.id===id); return n?n.label:(id||'一般'); };
+  const evs=data.events.filter(e=>!tlFilter||e.node===tlFilter).slice().reverse();
+  $('tlAll').hidden=!tlFilter;
+  $('tl').innerHTML=evs.length?evs.map(e=>{ const st=ST[e.status]||ST.todo; return `<div class="ev">
+      <span class="t">${fmt(e.ts)}</span>
+      <div class="body"><div class="head"><span class="nd">${esc(label(e.node))}</span><span class="status" style="font-size:12px"><i class="dot" style="background:var(${st.c})"></i>${st.zh}</span><span class="who2">${esc(who(e.actor))}</span></div>
+      ${e.summary?`<div>${esc(e.summary)}</div>`:''}${artHtml(e.artifacts)}</div></div>`; }).join('')
+    :`<p class="empty" style="padding-top:8px">${tlFilter?'這個節點還沒有紀錄。':'還沒有任何開發紀錄。AI 開始回報後會出現在這裡。'}</p>`;
+}
+
+function renderAll(){
+  $('title').textContent=data.title||data.project;
+  $('ver').textContent='v'+data.version; $('ver').hidden=false;
+  $('who').textContent=data.user||'';
+  $('purpose').textContent=data.spec.purpose||''; $('purpose').hidden=!data.spec.purpose;
+  if(!sel){ const first=data.spec.nodes.find(n=>{ const s=(nodeStatus(n.id)||{}).status; return s==='blocked'||s==='needs_review'||s==='working'; }); sel=first?first.id:null; }
+  renderSummary(); renderGraph(); renderDetail(); renderQuestions(); renderTimeline();
+  $('content').hidden=false;
+}
+
+$('graph').addEventListener('click',e=>{ const g=e.target.closest('.node'); if(!g) return; sel=g.dataset.id; tlFilter=null; renderGraph(); renderDetail(); renderTimeline(); });
+$('graph').addEventListener('keydown',e=>{ if(e.key!=='Enter'&&e.key!==' ') return; const g=e.target.closest('.node'); if(!g) return; e.preventDefault(); sel=g.dataset.id; renderGraph(); renderDetail(); });
+$('tlAll').onclick=()=>{ tlFilter=null; renderTimeline(); };
+
+async function load(){
+  $('refresh').disabled=true;
+  try{ data=await run('pageData',project); $('banner').hidden=true; renderAll(); }
+  catch(e){ banner((e&&e.message)||'讀取失敗'); }
+  $('refresh').disabled=false;
+}
+$('refresh').onclick=load;
+$('proj').onchange=()=>{ project=$('proj').value; sel=null; tlFilter=null; if(google.script.history) google.script.history.replace(null,{project}); load(); };
+
+(async()=>{
+  try{
+    const list=await run('pageProjects');
+    if(!list.length){ banner('還沒有任何專案。請先用 flow push-spec 發布規格。'); return; }
+    const want=(new URLSearchParams(location.search)).get('project');
+    project=(list.find(p=>p.project===want)||list[list.length-1]).project;
+    if(list.length>1){ $('proj').innerHTML=list.map(p=>`<option value="${esc(p.project)}"${p.project===project?' selected':''}>${esc(p.title||p.project)}</option>`).join(''); $('proj').hidden=false; }
+    if(google.script.url) google.script.url.getLocation(loc=>{ const p=loc.parameter&&loc.parameter.project; if(p&&p!==project&&list.some(x=>x.project===p)){ project=p; $('proj').value=p; load(); } });
+    await load();
+    setInterval(()=>{ if(document.visibilityState==='visible' && ![...document.querySelectorAll('.q textarea')].some(t=>t.value.trim()||t===document.activeElement)) load(); },60000);
+  }catch(e){ banner((e&&e.message)||'讀取失敗'); }
+})();
+</script>
+</body>
+</html>
