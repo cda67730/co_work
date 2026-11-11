@@ -537,7 +537,7 @@ function renderSpec(){
     ${cur?`<div class="aibar">
       <span class="ver">草稿 v${lastDraft?lastDraft.v:1}</span><span class="hint">${lastDraft?esc(fmt(lastDraft.ts)+' · '+who(lastDraft.by)+'：'+lastDraft.note):''}</span>
       <span class="sp"></span>
-      ${edit?`<button class="btn" id="openVers">版本紀錄</button><button class="btn primary" id="openSpecChat" ${S.plan.aiReady?'':'disabled'}>AI 對話整理意見${nOpen?`<span class="badge">${nOpen}</span>`:''}</button>`:''}
+      ${edit?`<button class="btn" id="regenSpec" ${S.plan.aiReady?'':'disabled'}>AI 重新產生整份</button><button class="btn" id="openVers">版本紀錄</button><button class="btn primary" id="openSpecChat" ${S.plan.aiReady?'':'disabled'}>AI 對話整理意見${nOpen?`<span class="badge">${nOpen}</span>`:''}</button>`:''}
     </div>`:''}
     <div class="two">
       <div class="list">
@@ -557,6 +557,7 @@ function renderSpec(){
   if(!edit) return;
   $('openSpecChat').onclick=()=>openChat('spec');
   $('openVers').onclick=openVersions;
+  $('regenSpec').onclick=e=>{ const b=e.target; if(b.dataset.armed!=='1'){ b.dataset.armed='1'; b.textContent='再按一次：整份重畫（舊版留在版本紀錄）'; return; } aiSpecRun(true); };
   $('pubBtn').onclick=()=>{
     $('pubBox').innerHTML=`<div class="confirm"><b>確定定稿嗎？</b><span class="hint">AI Agent 會依這份規格${base?'更新，只重做有變動的步驟':'開始開發'}，專案進入「開發」。</span>
       ${w.length?`<span class="hint warnc">規格檢查還有 ${w.length} 個提醒。</span>`:''}${nOpen?`<span class="hint warnc">還有 ${nOpen} 則同事意見沒有處理。</span>`:''}
@@ -666,7 +667,7 @@ function openVersions(){
 }
 function keyHelp(){ return `<div class="keyhelp"><b>AI 功能還不能用：還沒設定 Gemini API key</b><ol><li>到 Google AI Studio（aistudio.google.com）建立 API key</li><li>Apps Script 左側「專案設定」→ 最下方「指令碼屬性」→ 新增屬性 <code>GEMINI_API_KEY</code>，值貼上 key → 儲存</li><li>回到這裡按「重新整理」，不用重新部署</li></ol></div>`; }
 async function aiThemesRun(msg){ busy(true,'AI 正在整理需求…（約 10–30 秒）'); try{ S.plan=await run('pageThemesChat',S.project,msg||''); renderProject(); toast(`整理出 ${S.plan.themes.length} 個主題`); }catch(e){ renderProject(); toast(e.message||'AI 整理失敗'); } busy(false); }
-async function aiSpecRun(){ busy(true,'AI 正在畫流程圖、寫驗收標準…（約 20–60 秒）'); try{ S.plan=await run('pageSpecChat',S.project,'',false); renderProject(); toast('初版流程圖完成'); }catch(e){ renderProject(); toast(e.message||'AI 產生失敗'); } busy(false); }
+async function aiSpecRun(regen){ busy(true,'AI 正在畫流程圖、寫驗收標準…（約 20–60 秒）'); try{ S.plan=await run('pageSpecChat',S.project,'',false,!!regen); renderProject(); toast(regen?'已重新產生流程圖':'初版流程圖完成'); }catch(e){ renderProject(); toast(e.message||'AI 產生失敗'); } busy(false); }
 function busy(on,msg){ const o=$('busy'); o.hidden=!on; if(on) $('busyMsg').textContent=msg||'處理中…'; }
 
 /* ---------- ⑤ 共用看過程 ---------- */

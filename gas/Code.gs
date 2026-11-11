@@ -267,7 +267,7 @@ function pagePublish(project) {
 }
 
 /* ================= AI（Gemini） ================= */
-function gemini_(kind, system, user) {
+function gemini_(kind, system, user, schema) {
   const props = PropertiesService.getScriptProperties();
   const key = props.getProperty('GEMINI_API_KEY');
   if (!key) throw new Error('還沒設定 Gemini API key：到 Apps Script「專案設定」→「指令碼屬性」新增 GEMINI_API_KEY。');
@@ -278,7 +278,7 @@ function gemini_(kind, system, user) {
     payload: JSON.stringify({
       systemInstruction: { parts: [{ text: system }] },
       contents: [{ role: 'user', parts: [{ text: user }] }],
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.4 },
+      generationConfig: Object.assign({ responseMimeType: 'application/json', temperature: 0.4 }, schema ? { responseSchema: schema } : {}),
     }),
   });
   const code = res.getResponseCode(), body = parse_(res.getContentText(), {});
@@ -291,6 +291,30 @@ function gemini_(kind, system, user) {
 }
 
 const NODE_TYPES = ['input', 'llm', 'retrieve', 'condition', 'tool', 'output'];
+
+/* Gemini 回覆結構（responseSchema），避免 AI 自由發揮格式或抄回範本 */
+const STR = { type: 'STRING' }, STRS = { type: 'ARRAY', items: { type: 'STRING' } };
+const SC_ACC = { type: 'ARRAY', items: { type: 'OBJECT', properties: { id: STR, text: STR }, required: ['id', 'text'] } };
+const SC_NODE = { type: 'OBJECT', properties: { id: STR, type: { type: 'STRING', enum: NODE_TYPES }, label: STR, description: STR, inputs: STRS, outputs: STRS, acceptance: SC_ACC },
+  required: ['id', 'type', 'label', 'description', 'inputs', 'outputs', 'acceptance'] };
+const SC_EDGE = { type: 'OBJECT', properties: { from: STR, to: STR, label: STR }, required: ['from', 'to'] };
+const SC_SPEC = { type: 'OBJECT', properties: { title: STR, purpose: STR, nodes: { type: 'ARRAY', items: SC_NODE }, edges: { type: 'ARRAY', items: SC_EDGE }, decisions: STRS, openQuestions: STRS },
+  required: ['title', 'purpose', 'nodes', 'edges', 'decisions', 'openQuestions'] };
+const SC_FRESH = { type: 'OBJECT', properties: { reply: STR, spec: SC_SPEC }, required: ['reply', 'spec'] };
+const SC_OPS = { type: 'OBJECT', properties: {
+  reply: STR,
+  ops: { type: 'ARRAY', items: { type: 'OBJECT', properties: {
+    op: { type: 'STRING', enum: ['add_node', 'update_node', 'remove_node', 'connect', 'disconnect', 'set_decisions', 'set_open_questions', 'set_title', 'set_purpose'] },
+    id: STR, node: SC_NODE,
+    set: { type: 'OBJECT', properties: { type: { type: 'STRING', enum: NODE_TYPES }, label: STR, description: STR, inputs: STRS, outputs: STRS, acceptance: SC_ACC } },
+    from: STR, to: STR, label: STR, list: STRS, text: STR }, required: ['op'] } },
+  resolved: STRS,
+  unresolved: { type: 'ARRAY', items: { type: 'OBJECT', properties: { id: STR, reason: STR }, required: ['id', 'reason'] } } },
+  required: ['reply', 'ops', 'resolved', 'unresolved'] };
+const SC_THEMES = { type: 'OBJECT', properties: { reply: STR, themes: { type: 'ARRAY', items: { type: 'OBJECT',
+  properties: { id: STR, title: STR, summary: STR, needIds: STRS, conflict: STR, decision: STR }, required: ['id', 'title', 'summary', 'needIds', 'conflict', 'decision'] } } },
+  required: ['reply', 'themes'] };
+const isPlaceholder_ = v => /^\s*(…|\.{3}|-|—|xxx|todo|tbd)?\s*$/i.test(String(v == null ? '' : v));
 
 function chatAppend_(project, round, stage, role, author, text, log) {
   appendObj_('chats', { ts: now_(), project: project, round: round, stage: stage, role: role, author: author, text: text, log: JSON.stringify(log || []) });
@@ -319,15 +343,16 @@ function pageThemesChat(project, message) {
     '2. 同事之間意見衝突的地方不要合併成模糊說法，寫在 conflict，交給人決定',
     '3. 不要加入需求裡沒有的內容；附議多的需求要反映在 summary',
     '4. 已經有主題時，依使用者的指示修改：沒提到的主題保持原樣，主題的 id 和 decision 一律保留',
-    '只回覆 JSON：{"reply":"用一兩句話說明你做了什麼","themes":[{"id":"沿用原 id，新主題留空","title":"10 字內","summary":"1-2 句","needIds":["n…"],"conflict":"沒有就空字串","decision":"保留原值"}]}',
+    '回覆欄位：reply 用一兩句話說明你做了什麼；themes 每個主題有 id（沿用原本的 id，新主題給空字串）、title（10 字內）、summary（1 到 2 句）、needIds（需求編號，例如 nsckk70e4）、conflict（沒有衝突就給空字串）、decision（保留原值，沒有就空字串）。',
+    '所有內容都要根據上面的需求實際撰寫，不可以出現「…」或範例文字。',
   ].join('\n');
   const prompt = '專案：' + p.title + (p.purpose ? '（目的：' + p.purpose + '）' : '') + (round > 1 ? '\n這是第 ' + round + ' 輪，系統已上線，以下是新增需求。' : '') +
     '\n\n需求：\n' + needsText_(needs) +
     '\n\n目前主題：\n' + (plan.themes.length ? JSON.stringify(plan.themes) : '（還沒有）') +
     '\n\n最近對話：\n' + (recentChat_(project, round, 'themes', 6) || '（無）') +
     '\n\n這次的指示：' + msg;
-  const out = gemini_('fast', system, prompt);
-  if (!Array.isArray(out.themes)) throw new Error('AI 沒有回傳主題，請換個說法再試一次。');
+  const out = gemini_('fast', system, prompt, SC_THEMES);
+  if (!Array.isArray(out.themes) || !out.themes.length || out.themes.some(t => isPlaceholder_(t.title))) throw new Error('AI 沒有回傳有效的主題，請再試一次。');
   const old = Object.fromEntries(plan.themes.map(t => [t.id, t]));
   let n = plan.themes.length;
   const themes = out.themes.map(t => {
@@ -345,38 +370,40 @@ function pageThemesChat(project, message) {
 }
 
 /** ③ 畫圖及規格：AI 產生初版或依意見修改（只輸出差異） */
-function pageSpecChat(project, message, includeComments) {
+function pageSpecChat(project, message, includeComments, regenerate) {
   const user = ownerOnly_();
   const plan = pagePlanning(project);
   const p = plan.info, round = plan.round;
   const draft = parse_(plan.draft, null);
-  const fresh = !draft || !Array.isArray(draft.nodes) || !draft.nodes.length;
+  const fresh = !!regenerate || !draft || !Array.isArray(draft.nodes) || !draft.nodes.length;
   const open = includeComments ? plan.comments.filter(c => c.status === 'open') : [];
-  const msg = String(message || '').trim() || (fresh ? '請依需求與主題產生初版流程與規格。' : open.length ? '請把同事的意見整理進規格。' : '');
+  const msg = String(message || '').trim() || (fresh ? (regenerate ? '請依需求與主題重新產生整份流程與規格。' : '請依需求與主題產生初版流程與規格。') : open.length ? '請把同事的意見整理進規格。' : '');
   if (!msg) throw new Error('請輸入要修改的內容。');
   const rules = [
     '你是系統分析師，和團隊一起設計一個工作流程。之後 AI Agent 會照規格開發，不寫程式的同事會依驗收標準驗收。用繁體中文。',
     '節點 type 只能是：input（輸入）、llm（AI 判斷或生成）、retrieve（查資料）、condition（分流）、tool（程式處理）、output（輸出）。',
     '每個節點：id（英文小寫加底線）、type、label（白話）、description（白話）、inputs、outputs（英文小寫欄位名，下游要的欄位上游一定要有）、acceptance（除了 input 都要有，具體可測試，例如「問『學費怎麼繳』要分到行政類」，格式 [{"id":"a1","text":"…"}]）。',
     'condition 的分支名稱寫在連線 label。已決定的事放 decisions；還沒決定的放 openQuestions，不要自己做決定。不要加入需求沒有的功能。',
+    '所有內容都要根據下面的需求實際撰寫，不可以出現「…」、範例文字或空白的名稱。',
   ];
   let system, prompt;
   const ctx = '專案：' + p.title + (p.purpose ? '（目的：' + p.purpose + '）' : '') +
     '\n\n主題：\n' + (plan.themes.map(t => '■ ' + t.title + '：' + t.summary + (t.decision ? '\n  已決定：' + t.decision : t.conflict ? '\n  尚未決定：' + t.conflict : '')).join('\n') || '（無）') +
     '\n\n這一輪的需求：\n' + needsText_(plan.needs.filter(n => n.round === round));
   if (fresh) {
-    system = rules.concat(['流程拆成 4 到 10 個節點。',
-      '只回覆 JSON：{"reply":"一兩句說明","spec":{"title":"…","purpose":"…","nodes":[…],"edges":[{"from":"…","to":"…","label":"可省略"}],"decisions":[],"openQuestions":[]}}']).join('\n');
+    system = rules.concat(['流程拆成 4 到 10 個節點，從 input 節點開始，到 output 節點結束，每個節點都要有連線。',
+      '回覆欄位：reply 用一兩句話說明這份流程；spec 是完整規格（title、purpose、nodes、edges、decisions、openQuestions）。edges 的 from、to 要用節點 id。']).join('\n');
     prompt = ctx + '\n\n指示：' + msg;
   } else {
     const locked = draft.nodes.filter(n => n.locked).map(n => n.id);
     system = rules.concat([
       '現在要修改既有的規格。只輸出「修改動作」，不要重寫整份。沒提到的節點不要動；locked 為 true 的節點完全不能修改或刪除（可以連線到它）。',
-      '修改動作：',
-      '{"op":"add_node","node":{完整節點}}、{"op":"update_node","id":"…","set":{要改的欄位}}、{"op":"remove_node","id":"…"}、',
-      '{"op":"connect","from":"…","to":"…","label":"可省略"}、{"op":"disconnect","from":"…","to":"…"}、{"op":"set","field":"decisions|openQuestions|title|purpose","value":…}',
-      '有同事意見時，逐則判斷：採納的放 resolved；不採納或需要人決定的放 unresolved 並說明原因。',
-      '只回覆 JSON：{"reply":"一兩句說明改了什麼","ops":[…],"resolved":["c…"],"unresolved":[{"id":"c…","reason":"…"}]}',
+      '修改動作（ops 陣列，每個動作用 op 指定種類）：',
+      'add_node：新增步驟，完整節點放在 node；update_node：修改步驟，id 指定節點、要改的欄位放在 set；remove_node：刪除步驟，id 指定節點；',
+      'connect：新增連線，用 from、to（節點 id），分支名稱放 label；disconnect：移除連線，用 from、to；',
+      'set_decisions、set_open_questions：用 list 給完整的新清單；set_title、set_purpose：用 text 給新內容。',
+      '有同事意見時，逐則判斷：採納的意見編號放 resolved；不採納或需要人決定的放 unresolved，並寫 reason。沒有就給空陣列。',
+      'reply 用一兩句話說明改了什麼。',
     ]).join('\n');
     prompt = ctx + '\n\n目前規格：\n' + JSON.stringify(draft) +
       (locked.length ? '\n\n鎖定節點（不能改）：' + locked.join(', ') : '') +
@@ -384,16 +411,18 @@ function pageSpecChat(project, message, includeComments) {
       '\n\n最近對話：\n' + (recentChat_(project, round, 'spec', 6) || '（無）') +
       '\n\n這次的指示：' + msg;
   }
-  const out = gemini_('spec', system, prompt);
+  const out = gemini_('spec', system, prompt, fresh ? SC_FRESH : SC_OPS);
   let spec, log = [];
   if (fresh) {
     if (!out.spec || !Array.isArray(out.spec.nodes)) throw new Error('AI 沒有回傳規格，請再試一次。');
-    spec = normalizeSpec_(out.spec); log = ['產生 ' + spec.nodes.length + ' 個節點'];
+    spec = normalizeSpec_(out.spec);
+    if (spec.nodes.length < 2 || spec.nodes.some(n => isPlaceholder_(n.label) || isPlaceholder_(n.id))) throw new Error('AI 回傳的流程圖不完整（步驟名稱空白或只有範本），沒有存檔，請再試一次。');
+    log = [(regenerate ? '重新產生 ' : '產生 ') + spec.nodes.length + ' 個步驟'];
   } else {
     const r = applySpecOps_(draft, out.ops || []); spec = r.spec; log = r.log;
   }
   withLock_(() => {
-    const v = saveDraft_(project, round, spec, 'AI', String(out.reply || '').slice(0, 80) || (fresh ? 'AI 產生初版' : 'AI 修改'));
+    const v = saveDraft_(project, round, spec, 'AI', String(out.reply || '').slice(0, 80) || (fresh ? (regenerate ? 'AI 重新產生' : 'AI 產生初版') : 'AI 修改'));
     chatAppend_(project, round, 'spec', 'user', user, msg + (open.length ? '（附 ' + open.length + ' 則同事意見）' : ''));
     chatAppend_(project, round, 'spec', 'ai', 'AI', String(out.reply || '已更新。') + '（草稿 v' + v + '）', log);
     const unres = Object.fromEntries((out.unresolved || []).map(u => [u.id, u.reason]));
@@ -407,8 +436,10 @@ function pageSpecChat(project, message, includeComments) {
 function normalizeSpec_(spec) {
   spec.nodes = (spec.nodes || []).filter(n => n && n.id).map(normNode_);
   spec.edges = (spec.edges || []).filter(e => e && e.from && e.to);
-  spec.decisions = Array.isArray(spec.decisions) ? spec.decisions : [];
-  spec.openQuestions = Array.isArray(spec.openQuestions) ? spec.openQuestions : [];
+  spec.decisions = (Array.isArray(spec.decisions) ? spec.decisions : []).filter(x => !isPlaceholder_(x));
+  spec.openQuestions = (Array.isArray(spec.openQuestions) ? spec.openQuestions : []).filter(x => !isPlaceholder_(x));
+  const ids = new Set(spec.nodes.map(n => n.id));
+  spec.edges = spec.edges.filter(e => ids.has(e.from) && ids.has(e.to));
   return spec;
 }
 function normNode_(n) {
@@ -430,7 +461,7 @@ function applySpecOps_(draft, ops) {
     if (!o || !o.op) return;
     if (o.op === 'add_node' && o.node && o.node.id) {
       const n = normNode_(o.node);
-      if (find(n.id)) return;
+      if (find(n.id) || isPlaceholder_(n.label)) return;
       spec.nodes.push(n); log.push('＋ 新增「' + n.label + '」');
     } else if (o.op === 'update_node') {
       const n = find(o.id); if (!n || n.locked) return;
@@ -446,6 +477,11 @@ function applySpecOps_(draft, ops) {
     } else if (o.op === 'disconnect') {
       const b = spec.edges.length; spec.edges = spec.edges.filter(e => !(e.from === o.from && e.to === o.to));
       if (spec.edges.length < b) log.push('移除連線 ' + label(o.from) + ' → ' + label(o.to));
+    } else if (o.op === 'set_decisions' || o.op === 'set_open_questions') {
+      const f = o.op === 'set_decisions' ? 'decisions' : 'openQuestions';
+      spec[f] = (o.list || []).filter(x => !isPlaceholder_(x)); log.push('更新' + (f === 'decisions' ? '已決定事項' : '待決定事項'));
+    } else if ((o.op === 'set_title' || o.op === 'set_purpose') && !isPlaceholder_(o.text)) {
+      spec[o.op === 'set_title' ? 'title' : 'purpose'] = o.text; log.push('更新' + (o.op === 'set_title' ? '標題' : '目的'));
     } else if (o.op === 'set' && ['decisions', 'openQuestions', 'title', 'purpose'].indexOf(o.field) >= 0) {
       spec[o.field] = o.value; log.push('更新 ' + ({ decisions: '已決定事項', openQuestions: '待決定事項', title: '標題', purpose: '目的' })[o.field]);
     }
