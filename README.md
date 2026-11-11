@@ -8,7 +8,7 @@
 | `AGENTS.md` | 給 AI Agent 的開發守則 |
 | `specs/` | 規格原稿（發布到平台前的版本） |
 | `gas/Code.gs` | 平台後端（Google Apps Script） |
-| `gas/Page.html` | 共創平台頁面：開專案、收集需求、整理、規格、開發追蹤 |
+| `gas/Page.html` | 使用者共創頁面：開專案、收集需求、整理、規格、開發追蹤，可多輪迭代 |
 | `.flow/` | 從平台拉下來的定稿規格（`pull` 產生） |
 
 ## 第一次設定（Windows PowerShell）
@@ -24,7 +24,7 @@ node flow.mjs status
 
 token 存在 `.flow/token`，已列入 `.gitignore`，不會被 commit。
 
-## 共創平台頁面（給同事）
+## 使用者共創頁面（給同事）
 
 流程：開專案（管理者）→ 同事提需求、＋1、留言 → 整理成主題 → 寫規格草稿 → 定稿發布 → Agent 開發。
 管理者是這份 Sheet 的擁有者。整理與規格目前用「複製提示詞 → 貼到 Claude／Gemini → 貼回結果」完成，之後可以改成直接呼叫 API。

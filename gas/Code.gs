@@ -17,8 +17,8 @@ const SHEETS = {
   specs:     ['project', 'version', 'title', 'status', 'specJson', 'specMd', 'createdAt', 'createdBy'],
   events:    ['ts', 'project', 'version', 'node', 'status', 'summary', 'artifacts', 'commit', 'actor'],
   questions: ['id', 'ts', 'project', 'version', 'node', 'question', 'status', 'answer', 'answeredBy', 'answeredAt', 'actor'],
-  projects:  ['project', 'title', 'purpose', 'due', 'status', 'themesJson', 'draftJson', 'createdAt', 'createdBy', 'updatedAt'],
-  needs:     ['id', 'ts', 'project', 'author', 'now', 'pain', 'want', 'plus', 'commentsJson'],
+  projects:  ['project', 'title', 'purpose', 'due', 'status', 'themesJson', 'draftJson', 'createdAt', 'createdBy', 'updatedAt', 'round'],
+  needs:     ['id', 'ts', 'project', 'author', 'topic', 'pain', 'want', 'plus', 'commentsJson', 'round'],
 };
 const PHASES = ['collecting', 'organizing', 'drafting', 'developing'];
 const STATUSES = ['todo', 'working', 'done', 'blocked', 'needs_review'];
@@ -52,7 +52,7 @@ function doGet(e) {
   const q = e.parameter || {};
   if (q.action) return handle_(q);
   return HtmlService.createTemplateFromFile('Page').evaluate()
-    .setTitle('開發追蹤')
+    .setTitle('使用者共創')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
@@ -89,13 +89,13 @@ function pageProjects() {
   const needCount = {};
   rows_('needs').forEach(r => { needCount[r.project] = (needCount[r.project] || 0) + 1; });
   const list = rows_('projects').map(r => ({
-    project: r.project, title: r.title, purpose: r.purpose, due: r.due, status: r.status,
+    project: r.project, title: r.title, purpose: r.purpose, due: r.due, status: r.status, round: Number(r.round) || 1,
     version: latest[r.project] ? Number(latest[r.project].version) : 0, needs: needCount[r.project] || 0,
   }));
   // 只有規格、沒有開專案紀錄的（例如用 flow push-spec 發布的）視為開發中
   Object.values(latest).forEach(r => {
     if (!list.some(p => p.project === r.project)) {
-      list.push({ project: r.project, title: r.title, purpose: '', due: '', status: 'developing', version: Number(r.version), needs: 0 });
+      list.push({ project: r.project, title: r.title, purpose: '', due: '', status: 'developing', round: 1, version: Number(r.version), needs: 0, external: true });
     }
   });
   return { user: user, isOwner: isOwner_(user), projects: list };
@@ -109,7 +109,8 @@ function pageCreateProject(p) {
   return withLock_(() => {
     if (rows_('projects').some(r => r.project === id) || rows_('specs').some(r => r.project === id)) throw new Error('這個專案代號已經用過了。');
     const now = now_();
-    sheet_('projects').appendRow([id, String(p.title).trim(), String(p.purpose || '').trim(), String(p.due || ''), 'collecting', '', '', now, user, now]);
+    appendObj_('projects', { project: id, title: String(p.title).trim(), purpose: String(p.purpose || '').trim(), due: String(p.due || ''),
+      status: 'collecting', themesJson: '', draftJson: '', createdAt: now, createdBy: user, updatedAt: now, round: 1 });
     return { project: id };
   });
 }
@@ -121,16 +122,50 @@ function pageSetPhase(project, phase) {
   return pagePlanning(project);
 }
 
+/** 已發布的專案開始下一輪：回到收集需求，規格草稿以目前版本為底 */
+function pageNextRound(project) {
+  const user = ownerOnly_();
+  withLock_(() => {
+    let p = rows_('projects').find(r => r.project === project);
+    const cur = getSpec_({ project: project });
+    if (!p) {   // 用 flow push-spec 發布、沒有開專案紀錄的，補一筆
+      appendObj_('projects', { project: project, title: cur.title || project, purpose: cur.spec.purpose || '', due: '', status: 'developing',
+        themesJson: '', draftJson: '', createdAt: now_(), createdBy: user, updatedAt: now_(), round: 1 });
+      p = rows_('projects').find(r => r.project === project);
+    }
+    if (p.status !== 'developing') throw new Error('目前已經在進行新一輪了。');
+    const base = Object.assign({}, cur.spec); delete base.version;
+    updateRow_('projects', 'project', project, {
+      status: 'collecting', round: (Number(p.round) || 1) + 1, themesJson: '[]',
+      draftJson: JSON.stringify(base, null, 2), updatedAt: now_(),
+    });
+  });
+  return pagePlanning(project);
+}
+
+/** 取消這一輪，回到開發中（這一輪沒有需求時，輪次也一併退回） */
+function pageCancelRound(project) {
+  ownerOnly_();
+  withLock_(() => {
+    const p = rows_('projects').find(r => r.project === project);
+    const round = Number(p && p.round) || 1;
+    if (!p || round < 2 || p.status === 'developing') throw new Error('沒有進行中的新一輪。');
+    const has = rows_('needs').some(r => r.project === project && (Number(r.round) || 1) === round);
+    updateRow_('projects', 'project', project, { status: 'developing', round: has ? round : round - 1, updatedAt: now_() });
+  });
+  return pagePlanning(project);
+}
+
 /** 需求、主題、草稿（前半段） */
 function pagePlanning(project) {
   const user = pageUser_();
   const p = rows_('projects').find(r => r.project === project);
   const needs = rows_('needs').filter(r => r.project === project).map(r => ({
-    id: r.id, ts: r.ts, author: r.author, now: r.now, pain: r.pain, want: r.want,
+    id: r.id, ts: r.ts, author: r.author, topic: r.topic || r.now || '', pain: r.pain, want: r.want, round: Number(r.round) || 1,
     plus: String(r.plus || '').split(',').filter(Boolean), comments: parse_(r.commentsJson, []),
   }));
   return {
-    user: user, isOwner: isOwner_(user), project: project,
+    user: user, isOwner: isOwner_(user), project: project, round: p ? (Number(p.round) || 1) : 1,
     info: p ? { title: p.title, purpose: p.purpose, due: p.due, status: p.status } : null,
     needs: needs, themes: p ? parse_(p.themesJson, []) : [], draft: p ? (p.draftJson || '') : '',
   };
@@ -141,9 +176,11 @@ function pageAddNeed(project, n) {
   const p = rows_('projects').find(r => r.project === project);
   if (!p) throw new Error('找不到這個專案。');
   if (p.status !== 'collecting' && !isOwner_(user)) throw new Error('這個專案已經停止收集需求。');
-  const now = String(n.now || '').trim(), pain = String(n.pain || '').trim(), want = String(n.want || '').trim();
-  if (!pain && !want) throw new Error('至少要填「遇到的問題」或「希望變成怎樣」。');
-  withLock_(() => sheet_('needs').appendRow(['n' + Date.now().toString(36).slice(-5) + Math.random().toString(36).slice(2, 5), now_(), project, user, now, pain, want, '', '[]']));
+  const topic = String(n.topic || '').trim(), pain = String(n.pain || '').trim(), want = String(n.want || '').trim();
+  if (!topic) throw new Error('請填「主題」。');
+  if (!pain && !want) throw new Error('「遇到的問題」和「希望變成什麼」至少填一個。');
+  withLock_(() => appendObj_('needs', { id: 'n' + Date.now().toString(36).slice(-5) + Math.random().toString(36).slice(2, 5), ts: now_(),
+    project: project, author: user, topic: topic, pain: pain, want: want, plus: '', commentsJson: '[]', round: Number(p.round) || 1 }));
   return pagePlanning(project);
 }
 
@@ -348,8 +385,21 @@ function sheet_(name) {
     sh = ss.insertSheet(name);
     sh.appendRow(SHEETS[name]);
     sh.setFrozenRows(1);
+  } else if (sh && SHEETS[name]) {     // 舊版分頁缺欄位就補在最後
+    const head = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0];
+    const legacy = { topic: 'now' };
+    const missing = SHEETS[name].filter(h => head.indexOf(h) < 0 && head.indexOf(legacy[h]) < 0);
+    if (missing.length) sh.getRange(1, head.filter(String).length + 1, 1, missing.length).setValues([missing]);
   }
   return sh;
+}
+
+/** 依標題列欄位順序寫入一列（新舊欄位順序不同也不會錯位） */
+function appendObj_(name, obj) {
+  const sh = sheet_(name);
+  const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const legacy = { now: 'topic' };
+  sh.appendRow(head.map(h => (obj[h] !== undefined ? obj[h] : obj[legacy[h]] !== undefined ? obj[legacy[h]] : '')));
 }
 
 /** 依 key 欄位找到列並更新指定欄位（rowIndex 從 1 起算，含標題列） */

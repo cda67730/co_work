@@ -5,17 +5,18 @@
 <meta charset="utf-8">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* 版面：頁首（專案切換）→ 專案列（名稱＋階段進度）→ 分頁（需求／整理／規格／開發）；手機改單欄 */
+/* 版面：頁首 → 專案列（名稱＋階段進度）→ 分頁（需求／整理／規格／開發）；手機改單欄
+   色彩：石墨灰的冷調中性色＋琥珀橘重點色（暖色的科技感） */
 :root{
-  --bg:#f2f4f3; --panel:#ffffff; --ink:#1c2422; --muted:#5f6b67; --line:#d6dcda; --soft:#f7f9f8;
-  --accent:#1f6f5c; --accent-ink:#ffffff; --accent-soft:#e3f0ec;
+  --bg:#f3f2ef; --panel:#ffffff; --ink:#1e1d1b; --muted:#6a655d; --line:#dedad2; --soft:#f8f7f4;
+  --accent:#c2540a; --accent-ink:#ffffff; --accent-soft:#fbeadb;
   --s-todo:#8a948f; --s-working:#2f6fb8; --s-done:#2e8b57; --s-blocked:#c0392b; --s-review:#c28a00;
   --sans:"Noto Sans TC",system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme: dark){:root{
-  --bg:#141917; --panel:#1b2220; --ink:#e3e9e6; --muted:#97a39e; --line:#2c3633; --soft:#171d1b;
-  --accent:#5cc3a6; --accent-ink:#0f1513; --accent-soft:#1f3530;
+  --bg:#121417; --panel:#1a1d22; --ink:#ebe7e1; --muted:#9c968c; --line:#2b2f36; --soft:#16191d;
+  --accent:#ff9447; --accent-ink:#1a1209; --accent-soft:#3a2617;
   --s-todo:#7d8883; --s-working:#6ea6e6; --s-done:#5cc28a; --s-blocked:#ef7a6d; --s-review:#e6b84a;
   color-scheme:dark}}
 *{box-sizing:border-box}
@@ -64,11 +65,19 @@ label.f>span{color:var(--muted);font-size:12.5px}
 .card h2 .sp{flex:1}
 .card .in{padding:14px;display:grid;gap:12px}
 .two{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:14px;align-items:start}
+.two.flip{grid-template-columns:360px minmax(0,1fr)}
+.req{font-style:normal;font-size:11px;color:var(--accent);margin-left:4px}
+details.older{border:1px dashed var(--line);border-radius:8px;padding:10px 14px}
+details.older summary{cursor:pointer;color:var(--muted);font-size:13px}
+.diff{display:grid;gap:4px;font-size:13px;margin:0;padding:0;list-style:none}
+.diff .add{color:var(--s-done)}.diff .chg{color:var(--s-working)}.diff .del{color:var(--s-blocked)}
 .empty{color:var(--muted);font-size:13px;margin:0}
 .hint{font-size:12.5px;color:var(--muted);margin:0}
 
 /* 需求卡片 */
 .need{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:12px 14px;display:grid;gap:8px}
+.ntopic{font-weight:700;font-size:15px;line-height:1.4}
+.roundhd{font-size:12.5px;color:var(--muted);letter-spacing:.06em;font-weight:700;margin:6px 0 0}
 .need .hd{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
 .need .hd b{color:var(--ink);font-weight:500}
 .need .hd .nid{font-family:var(--mono);font-size:11px}
@@ -172,14 +181,14 @@ textarea.code{font-family:var(--mono);font-size:12.5px;min-height:360px;line-hei
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:6px;font-size:13px;z-index:9}
 .loading{color:var(--muted);font-size:13px}
 
-@media (max-width:900px){ .two,.bottom{grid-template-columns:1fr} }
+@media (max-width:900px){ .two,.two.flip,.bottom{grid-template-columns:1fr} }
 @media (prefers-reduced-motion:reduce){ *{scroll-behavior:auto!important} }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <span class="brand">共創平台</span>
+    <span class="brand">使用者共創</span>
     <button class="btn sm" id="homeBtn" hidden>所有專案</button>
     <span class="sp"></span>
     <button class="btn sm" id="refresh">重新整理</button>
@@ -254,7 +263,7 @@ function renderHome(){
       </div></form></section>`:''}
     <div class="plist" style="margin-top:14px">${list.length?list.map(p=>`
       <button class="pcard" data-p="${esc(p.project)}">
-        <span class="ph">${PH[p.status]||p.status}${p.status==='developing'&&p.version?` · v${p.version}`:''}</span>
+        <span class="ph">${(p.round||1)>1?`第 ${p.round} 輪 · `:''}${PH[p.status]||p.status}${p.version?` · 已上線 v${p.version}`:''}</span>
         <span class="t">${esc(p.title||p.project)}</span>
         ${p.purpose?`<span class="hint">${esc(p.purpose)}</span>`:''}
         <span class="who2">${p.needs?`${p.needs} 則需求`:''}${p.due?`　截止 ${esc(String(p.due).slice(0,10))}`:''}</span>
@@ -279,38 +288,49 @@ async function openProject(id, tab){
 async function refreshProject(){
   const p=proj();
   const jobs=[];
-  if(p.status!=='developing' || p.needs) jobs.push(run('pagePlanning',S.project).then(r=>S.plan=r));
-  else S.plan={needs:[],themes:[],draft:'',info:null};
-  if(p.status==='developing') jobs.push(run('pageData',S.project).then(r=>S.dev=r));
+  if(!p.external) jobs.push(run('pagePlanning',S.project).then(r=>S.plan=r));
+  else S.plan={needs:[],themes:[],draft:'',info:null,round:1};
+  if(p.version>0) jobs.push(run('pageData',S.project).then(r=>S.dev=r));
   else S.dev=null;
   await Promise.all(jobs);
   renderProject();
 }
 function renderProject(){
   const p=proj(), cur=PH_ORDER.indexOf(p.status);
-  const tabs=[['needs','需求',S.plan.needs.length],['themes','整理',S.plan.themes.length],['spec','規格',''],['dev','開發','']];
+  const tabs=[['needs','需求',roundNeeds(curRound()).length],['themes','整理',S.plan.themes.length],['spec','規格',''],['dev','開發','']];
   $('view').innerHTML=`
     <div class="pbar">
       <h1>${esc(p.title||p.project)}</h1>
       ${p.purpose?`<p class="purpose">${esc(p.purpose)}</p>`:''}
       <div class="meta-line">
+        ${((S.plan&&S.plan.round)||p.round||1)>1?`<span class="ver">第 ${(S.plan&&S.plan.round)||p.round} 輪</span>`:''}
         <div class="steps">${PH_ORDER.map((k,i)=>`<span class="step ${i<cur?'done':i===cur?'cur':''}"><span class="no">${i<cur?'✓':i+1}</span>${PH[k]}</span>`).join('')}</div>
         ${p.due&&p.status==='collecting'?`<span>截止 ${esc(String(p.due).slice(0,10))}</span>`:''}
         ${p.version?`<span class="ver">規格 v${p.version}</span>`:''}
-        ${S.isOwner&&p.status!=='developing'?phaseButtons(p.status):''}
+        ${S.isOwner?phaseButtons(p):''}
       </div>
     </div>
     <nav class="tabs" role="tablist">${tabs.map(([k,l,c])=>`<button class="tab ${S.tab===k?'on':''}" data-tab="${k}" role="tab">${l}${c?`<span class="c">${c}</span>`:''}</button>`).join('')}</nav>
     <div id="tabBody" style="margin-top:14px"></div>`;
   $('view').querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ S.tab=b.dataset.tab; renderProject(); });
+  const nr=$('nextRound'); if(nr) nr.onclick=async()=>{
+    if(nr.dataset.armed!=='1'){ nr.dataset.armed='1'; nr.textContent='再按一次：回到收集需求（開發進度會保留）'; return; }
+    const r=await act(nr,'pageNextRound',S.project).catch(()=>null); if(!r) return;
+    S.plan=r; Object.assign(proj(),{status:'collecting',round:r.round,external:false}); S.tab='needs'; renderProject(); toast(`第 ${r.round} 輪開始收集需求`); };
+  const cr=$('cancelRound'); if(cr) cr.onclick=async()=>{
+    if(cr.dataset.armed!=='1'){ cr.dataset.armed='1'; cr.textContent='再按一次確定取消'; return; }
+    const r=await act(cr,'pageCancelRound',S.project).catch(()=>null); if(!r) return;
+    S.plan=r; Object.assign(proj(),{status:'developing',round:r.round}); S.tab='dev'; renderProject(); toast('已取消，回到開發中'); };
   $('view').querySelectorAll('[data-phase]').forEach(b=>b.onclick=async()=>{
     const r=await act(b,'pageSetPhase',S.project,b.dataset.phase).catch(()=>null); if(!r) return;
     S.plan=r; proj().status=b.dataset.phase; S.tab={collecting:'needs',organizing:'themes',drafting:'spec'}[b.dataset.phase]; renderProject(); toast('已切換到「'+PH[b.dataset.phase]+'」');
   });
   ({needs:renderNeeds,themes:renderThemes,spec:renderSpec,dev:renderDev})[S.tab]();
 }
-function phaseButtons(status){
-  const i=PH_ORDER.indexOf(status), b=[];
+function phaseButtons(p){
+  const status=p.status, i=PH_ORDER.indexOf(status), b=[], R=(S.plan&&S.plan.round)||p.round||1;
+  if(status==='developing') return `<button class="btn sm primary" id="nextRound">開始第 ${R+1} 輪需求</button>`;
+  if(i===0&&R>1) b.push(`<button class="btn sm" id="cancelRound">取消這一輪</button>`);
   if(i>0) b.push(`<button class="btn sm" data-phase="${PH_ORDER[i-1]}">退回「${PH[PH_ORDER[i-1]]}」</button>`);
   if(i<2) b.push(`<button class="btn sm primary" data-phase="${PH_ORDER[i+1]}">進入「${PH[PH_ORDER[i+1]]}」</button>`);
   return b.join('');
@@ -321,8 +341,9 @@ function themeOf(nid){ return S.plan.themes.find(t=>(t.needIds||[]).includes(nid
 function needCard(n, opts={}){
   const t=themeOf(n.id), mine=n.plus.includes(S.user);
   return `<article class="need" data-n="${esc(n.id)}">
+    ${n.topic?`<div class="ntopic">${esc(n.topic)}</div>`:''}
     <div class="hd"><b>${esc(who(n.author))}</b><span>${fmt(n.ts)}</span><span class="nid">${esc(n.id)}</span>${t?`<span class="ttag">${esc(t.title)}</span>`:''}</div>
-    <dl>${n.now?`<dt>現在</dt><dd>${esc(n.now)}</dd>`:''}${n.pain?`<dt>問題</dt><dd>${esc(n.pain)}</dd>`:''}${n.want?`<dt>希望</dt><dd>${esc(n.want)}</dd>`:''}</dl>
+    <dl>${n.pain?`<dt>問題</dt><dd>${esc(n.pain)}</dd>`:''}${n.want?`<dt>希望</dt><dd>${esc(n.want)}</dd>`:''}</dl>
     ${opts.compact?'':`<div class="ft"><button class="plus ${mine?'on':''}" data-plus="${esc(n.id)}" aria-pressed="${mine}">＋1 我也是${n.plus.length?` · ${n.plus.length}`:''}</button>
       <button class="linkbtn" data-cmt="${esc(n.id)}">${n.comments.length?`留言 ${n.comments.length}`:'留言'}</button></div>
     <div class="cmts" id="c_${esc(n.id)}" ${n.comments.length?'':'hidden'}>
@@ -331,23 +352,33 @@ function needCard(n, opts={}){
     </div>`}
   </article>`;
 }
+function curRound(){ return (S.plan&&S.plan.round)||proj().round||1; }
+function roundNeeds(r){ return S.plan.needs.filter(n=>(n.round||1)===r); }
 function renderNeeds(){
-  const p=proj(), open=p.status==='collecting'||S.isOwner;
-  const needs=S.plan.needs.slice().sort((a,b)=>b.plus.length-a.plus.length||String(b.ts).localeCompare(String(a.ts)));
-  $('tabBody').innerHTML=`<div class="two">
-    <div class="list">${needs.length?needs.map(n=>needCard(n)).join(''):`<p class="empty">還沒有人提需求。${open?'從右邊寫下第一則。':''}</p>`}</div>
-    <section class="card"><h2>提出需求</h2>
+  const p=proj(), open=p.status==='collecting'||S.isOwner, R=curRound();
+  const sort=a=>a.slice().sort((x,y)=>y.plus.length-x.plus.length||String(y.ts).localeCompare(String(x.ts)));
+  const cur=sort(roundNeeds(R)), older=[];
+  for(let r=R-1;r>=1;r--){ const l=roundNeeds(r); if(l.length) older.push([r,sort(l)]); }
+  $('tabBody').innerHTML=`<div class="two flip">
+    <section class="card"><h2>提出需求${R>1?`<span class="sp"></span><span class="who2">第 ${R} 輪</span>`:''}</h2>
       ${open?`<form class="in" id="needForm">
         <p class="hint">用平常說話的方式寫就好。看到別人寫過一樣的，按「＋1 我也是」就可以。</p>
-        <label class="f"><span>現在怎麼做</span><textarea id="nf_now" rows="2" placeholder="例：家長在 LINE 問問題，老師下班後才看到、一則一則回"></textarea></label>
-        <label class="f"><span>遇到的問題</span><textarea id="nf_pain" rows="3" placeholder="例：同樣的問題一直被問，學費、接送時間每週都有人問"></textarea></label>
-        <label class="f"><span>希望變成怎樣</span><textarea id="nf_want" rows="3" placeholder="例：常見問題能自動先回，老師只處理需要判斷的"></textarea></label>
+        <label class="f"><span>主題 <em class="req">必填</em></span><input type="text" id="nf_topic" maxlength="40" placeholder="例：常見問題自動回覆" required></label>
+        <label class="f"><span>遇到的問題</span><textarea id="nf_pain" rows="3" placeholder="例：學費、接送時間每週都有人問一樣的問題"></textarea></label>
+        <label class="f"><span>希望變成什麼</span><textarea id="nf_want" rows="3" placeholder="例：常見問題能自動先回，老師只處理需要判斷的"></textarea></label>
+        <p class="hint">「遇到的問題」和「希望變成什麼」擇一填寫即可。</p>
         <button class="btn primary" id="nf_btn">送出需求</button>
-      </form>`:`<div class="in"><p class="empty">這個專案已經停止收集需求，可以在左邊按「＋1」或留言補充。</p></div>`}
-    </section></div>`;
+      </form>`:`<div class="in"><p class="empty">這個專案目前沒有在收集需求，可以在右邊按「＋1」或留言補充。</p></div>`}
+    </section>
+    <div class="list">
+      ${R>1?`<p class="roundhd">第 ${R} 輪需求 · ${cur.length} 則</p>`:''}
+      ${cur.length?cur.map(n=>needCard(n)).join(''):`<p class="empty">${R>1?'這一輪還沒有人提需求。':'還沒有人提需求。'}${open?'從左邊寫下第一則。':''}</p>`}
+      ${older.map(([r,l])=>`<details class="older"><summary>第 ${r} 輪需求 · ${l.length} 則</summary><div class="list" style="margin-top:10px">${l.map(n=>needCard(n,{compact:true})).join('')}</div></details>`).join('')}
+    </div></div>`;
   bindNeedActions();
   const f=$('needForm'); if(f) f.onsubmit=async e=>{ e.preventDefault();
-    const r=await act($('nf_btn'),'pageAddNeed',S.project,{now:$('nf_now').value,pain:$('nf_pain').value,want:$('nf_want').value}).catch(()=>null);
+    if(!$('nf_pain').value.trim()&&!$('nf_want').value.trim()){ toast('「遇到的問題」和「希望變成什麼」至少填一個'); $('nf_pain').focus(); return; }
+    const r=await act($('nf_btn'),'pageAddNeed',S.project,{topic:$('nf_topic').value,pain:$('nf_pain').value,want:$('nf_want').value}).catch(()=>null);
     if(r){ S.plan=r; proj().needs=r.needs.length; renderProject(); toast('已送出，謝謝！'); } };
 }
 function bindNeedActions(){
@@ -364,8 +395,9 @@ function bindNeedActions(){
 /* ---------- ③ 整理 ---------- */
 function themesPrompt(){
   const p=proj();
-  const lines=S.plan.needs.map(n=>`[${n.id}] ${who(n.author)}（${n.plus.length} 人附議）\n現在：${n.now||'—'}\n問題：${n.pain||'—'}\n希望：${n.want||'—'}${n.comments.length?'\n留言：'+n.comments.map(c=>who(c.by)+'：'+c.text).join('／'):''}`).join('\n\n');
-  return `你是需求分析師。以下是同事對「${p.title}」提出的需求${p.purpose?`（專案目的：${p.purpose}）`:''}。
+  const R=curRound();
+  const lines=roundNeeds(R).map(n=>`[${n.id}] 主題：${n.topic||'—'}（${who(n.author)}，${n.plus.length} 人附議）\n問題：${n.pain||'—'}\n希望：${n.want||'—'}${n.comments.length?'\n留言：'+n.comments.map(c=>who(c.by)+'：'+c.text).join('／'):''}`).join('\n\n');
+  return `你是需求分析師。以下是同事對「${p.title}」提出的${R>1?`第 ${R} 輪（系統已上線 v${p.version}，這些是新增或修改的）`:''}需求${p.purpose?`（專案目的：${p.purpose}）`:''}。
 
 請歸納成 3 到 7 個主題。規則：
 1. 每個主題要列出來源需求編號（needIds），一則需求可以屬於多個主題
@@ -382,7 +414,7 @@ function themesPrompt(){
 ${lines}`;
 }
 function renderThemes(){
-  const owner=S.isOwner, themes=S.plan.themes, needs=S.plan.needs;
+  const owner=S.isOwner, themes=S.plan.themes, needs=roundNeeds(curRound());
   const unassigned=needs.filter(n=>!themeOf(n.id));
   const nmap=Object.fromEntries(needs.map(n=>[n.id,n]));
   $('tabBody').innerHTML=`<div class="two">
@@ -436,8 +468,12 @@ function renderThemes(){
 function specPrompt(){
   const p=proj(), th=S.plan.themes;
   const tlines=th.map(t=>`■ ${t.title}：${t.summary}${t.decision?`\n  已決定：${t.decision}`:''}${t.conflict&&!t.decision?`\n  尚未決定：${t.conflict}`:''}\n  來源：${(t.needIds||[]).join(', ')}`).join('\n');
-  const nlines=S.plan.needs.map(n=>`[${n.id}]（${n.plus.length} 人附議）問題：${n.pain||'—'}／希望：${n.want||'—'}`).join('\n');
-  return `你是系統分析師。請根據以下整理好的需求，寫出「${p.title}」的工作流程規格。之後會由 AI Agent 依這份規格開發，並由不寫程式的同事驗收。
+  const R=curRound(), base=R>1&&S.dev?S.dev.spec:null;
+  const nlines=roundNeeds(R).map(n=>`[${n.id}] ${n.topic||''}（${n.plus.length} 人附議）問題：${n.pain||'—'}／希望：${n.want||'—'}`).join('\n');
+  const head = base
+    ? `你是系統分析師。「${p.title}」已經上線 v${S.dev.version}，以下是第 ${R} 輪新增的需求。請在目前規格的基礎上修改，輸出完整的新版規格。\n\n重要：沒有變動的節點，id 和內容要原封不動保留；修改的節點沿用原本的 id；只有全新的步驟才用新 id。AI Agent 會依據差異只重做有變動的部分。\n\n目前規格（v${S.dev.version}）：\n${JSON.stringify(Object.assign({},base,{version:undefined}))}`
+    : `你是系統分析師。請根據以下整理好的需求，寫出「${p.title}」的工作流程規格。之後會由 AI Agent 依這份規格開發，並由不寫程式的同事驗收。`;
+  return `${head}
 
 專案目的：${p.purpose||'（未填）'}
 
@@ -459,6 +495,13 @@ ${nlines}
 只回覆一個 JSON，不要其他文字，格式：
 {"title":"…","purpose":"…","nodes":[{"id":"英文小寫_底線","type":"llm","label":"…","description":"…","inputs":["…"],"outputs":["…"],"acceptance":[{"id":"a1","text":"…"}]}],"edges":[{"from":"…","to":"…","label":"可省略"}],"decisions":["…"],"openQuestions":["…"]}`;
 }
+function specDiff(a,b){
+  const key=n=>JSON.stringify(Object.assign({},n,{x:undefined,y:undefined}));
+  const am=Object.fromEntries((a.nodes||[]).map(n=>[n.id,n])), bm=Object.fromEntries((b.nodes||[]).map(n=>[n.id,n])), out=[];
+  (b.nodes||[]).forEach(n=>{ if(!am[n.id]) out.push({k:'add',id:n.id,label:n.label||n.id}); else if(key(am[n.id])!==key(n)) out.push({k:'chg',id:n.id,label:n.label||n.id}); });
+  (a.nodes||[]).forEach(n=>{ if(!bm[n.id]) out.push({k:'del',id:n.id,label:n.label||n.id}); });
+  return out;
+}
 function lint(spec){
   const w=[], ids=new Set((spec.nodes||[]).map(n=>n.id)), edges=spec.edges||[];
   (spec.nodes||[]).forEach(n=>{ if(!n.id) w.push('有節點沒有 id'); if(!TYPE_ZH[n.type]) w.push(`${n.id} 的類型「${n.type}」不在六種類型裡`); });
@@ -475,25 +518,28 @@ function lint(spec){
 }
 function renderSpec(){
   const owner=S.isOwner, p=proj();
-  const text=S.plan.draft||'', spec=parseLoose(text);
   const published=p.status==='developing';
+  const text=published&&S.dev?JSON.stringify(S.dev.spec,null,2):(S.plan.draft||''), spec=parseLoose(text);
+  const base=!published&&S.dev?S.dev.spec:null, dl=base&&spec&&spec.nodes?specDiff(base,spec):null;
   $('tabBody').innerHTML=`<div class="two">
     <div class="list">
       <section class="card"><h2>流程預覽<span class="sp"></span>${spec?`<span class="who2">${(spec.nodes||[]).length} 個節點</span>`:''}</h2>
         ${spec&&spec.nodes?`<div class="graph" id="specGraph"></div>`:`<div class="in"><p class="empty">${text?'草稿不是有效的 JSON。':'還沒有規格草稿。'}${owner&&!published?'用右邊的步驟產生一版。':''}</p></div>`}
       </section>
+      ${dl?`<section class="card"><h2>和已上線 v${S.dev.version} 的差異</h2><div class="in">${dl.length?`<ul class="diff">${dl.map(d=>`<li class="${d.k}">${d.k==='add'?'＋ 新增':d.k==='chg'?'～ 修改':'－ 刪除'}　${esc(d.label)} <span class="who2">${esc(d.id)}</span></li>`).join('')}</ul><p class="hint">發布後 AI Agent 只需要處理這些節點。</p>`:`<p class="hint">目前草稿和 v${S.dev.version} 完全一樣。</p>`}</div></section>`:''}
       ${spec&&spec.nodes?`<section class="card"><h2>檢查結果</h2><div class="in">${(()=>{ const w=lint(spec); return w.length?`<ul class="warn">${w.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:`<p class="ok">✓ 節點、連線、輸入輸出、驗收標準都沒有問題</p>`; })()}</div></section>
       <section class="card"><h2>節點與驗收標準</h2><div class="in nlist">${spec.nodes.map(n=>`<div class="nitem"><div class="h">${esc(n.label||n.id)}<span class="id">${esc(n.id)} · ${TYPE_ZH[n.type]||esc(n.type)}</span></div>${n.description?`<div>${esc(n.description)}</div>`:''}${n.acceptance&&n.acceptance.length?`<ul>${n.acceptance.map(a=>`<li>${esc(a.text)}</li>`).join('')}</ul>`:''}</div>`).join('')}
         ${spec.decisions&&spec.decisions.length?`<div class="decision"><b>已決定：</b>${spec.decisions.map(esc).join('；')}</div>`:''}</div></section>`:''}
     </div>
     <section class="card"><h2>${owner&&!published?'產生與修改規格':'說明'}</h2><div class="in">
       ${owner&&!published?`
+        ${base?`<p class="hint">草稿已經帶入目前上線的 v${S.dev.version}，提示詞會請 AI 在這個基礎上修改。</p>`:''}
         <p class="hint">1. 複製提示詞（已包含主題、決定事項和原始需求）<br>2. 貼到 Claude 或 Gemini 的對話<br>3. 把回覆貼進下方，按「儲存草稿」</p>
         <button class="btn" id="copySpec">複製提示詞</button>
         <label class="f"><span>規格草稿（JSON，可以直接修改）</span><textarea class="code" id="draftIn" spellcheck="false">${esc(text)}</textarea></label>
         <button class="btn" id="saveDraft">儲存草稿</button>
         <div id="pubBox">${spec&&spec.nodes?`<button class="btn primary" id="pubBtn">定稿並發布 v${(p.version||0)+1}</button>`:''}</div>
-      `:published?`<p class="hint">規格已定稿，AI Agent 依這份規格開發中。進度請看「開發」分頁。要修改規格，請到開發追蹤裡提出，再由管理者發布新版本。</p>`
+      `:published?`<p class="hint">這是目前上線的 v${p.version} 規格，AI Agent 依這份規格開發中，進度請看「開發」分頁。有新需求時，管理者可以按上方「開始第 ${(p.round||1)+1} 輪需求」。</p>`
       :`<p class="hint">管理者會依整理好的主題產生規格。這裡可以看到流程和每個步驟的驗收標準，有意見請到「需求」分頁留言。</p>`}
     </div></section>
   </div>`;
@@ -507,7 +553,7 @@ function renderSpec(){
   };
   const pb=$('pubBtn'); if(pb) pb.onclick=()=>{
     const w=lint(spec);
-    $('pubBox').innerHTML=`<div class="confirm"><b>確定要定稿嗎？</b><span class="hint">定稿後 AI Agent 會依這份規格開始開發，專案進入「開發中」。之後要修改，需要發布新版本。</span>
+    $('pubBox').innerHTML=`<div class="confirm"><b>確定要定稿嗎？</b><span class="hint">定稿後 AI Agent 會依這份規格${base?'更新，只重做有變動的節點':'開始開發'}，專案進入「開發中」。</span>
       ${w.length?`<span class="hint" style="color:var(--s-review)">檢查結果還有 ${w.length} 個提醒，建議先處理。</span>`:''}
       <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" id="pubNo">取消</button><button class="btn primary" id="pubYes">確定發布</button></div></div>`;
     $('pubNo').onclick=()=>renderProject();
