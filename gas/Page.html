@@ -230,9 +230,12 @@ function copyText(text){
 function parseLoose(text){
   let t=String(text||'').trim();
   const fence=t.match(/```(?:json)?\s*([\s\S]*?)```/); if(fence) t=fence[1].trim();
-  try{ return JSON.parse(t); }catch(e){}
   const a=t.indexOf('{'), b=t.lastIndexOf('}');
-  if(a>=0&&b>a){ try{ return JSON.parse(t.slice(a,b+1)); }catch(e){} }
+  const cands=[t]; if(a>=0&&b>a) cands.push(t.slice(a,b+1));
+  // 手機、輸入法常把 " 換成彎引號：先試只換結構位置的，再試全部換掉
+  const smart=x=>x.replace(/([{\[,:]\s*)[“”„‟″]/g,'$1"').replace(/[“”„‟″](\s*[:,}\]])/g,'"$1');
+  const all=x=>x.replace(/[“”„‟″]/g,'"').replace(/[‘’]/g,"'");
+  for(const c of cands) for(const f of [x=>x, smart, all]){ try{ return JSON.parse(f(c)); }catch(e){} }
   return null;
 }
 
@@ -449,6 +452,7 @@ function renderThemes(){
   $('copyThemes').onclick=()=>copyText(themesPrompt());
   $('importThemes').onclick=async e=>{
     const obj=parseLoose($('themesIn').value), list=obj&&(Array.isArray(obj)?obj:obj.themes);
+    if(obj&&Array.isArray(obj.nodes)){ toast('這段是規格，請在「進入寫規格」後貼到「規格」分頁'); return; }
     if(!Array.isArray(list)||!list.length){ toast('看不懂這段內容，請確認貼上的是 AI 回覆的 JSON'); return; }
     const r=await act(e.target,'pageSaveThemes',S.project,list.map((t,i)=>({...t,id:'t'+(i+1)}))).catch(()=>null); if(r){ S.plan=r; renderProject(); toast(`已匯入 ${r.themes.length} 個主題`); }
   };
@@ -548,7 +552,8 @@ function renderSpec(){
   $('copySpec').onclick=()=>copyText(specPrompt());
   $('saveDraft').onclick=async e=>{
     const obj=parseLoose($('draftIn').value);
-    if(!obj||!Array.isArray(obj.nodes)){ toast('看不懂這段內容，請確認是包含 nodes 的 JSON'); return; }
+    if(obj&&Array.isArray(obj.themes)){ toast('這段是「整理」的主題結果，請貼到「整理」分頁'); return; }
+    if(!obj||!Array.isArray(obj.nodes)){ toast('看不懂這段內容，請確認貼上的是 AI 回覆的規格 JSON（包含 nodes）'); return; }
     const r=await act(e.target,'pageSaveDraft',S.project,JSON.stringify(obj)).catch(()=>null); if(r){ S.plan=r; renderProject(); toast('草稿已儲存'); }
   };
   const pb=$('pubBtn'); if(pb) pb.onclick=()=>{
