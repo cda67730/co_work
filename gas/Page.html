@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* 版面：頁首 → 專案列（名稱＋階段進度）→ 分頁（需求／整理／規格／開發）；手機改單欄
+/* 版面：頁首 → 專案名稱 → 單一流程（收集→整理→畫圖及規格→開發→共用看過程）→ 該階段畫面；手機改單欄
    色彩：石墨灰的冷調中性色＋琥珀橘重點色（暖色的科技感） */
 :root{
   --bg:#f3f2ef; --panel:#ffffff; --ink:#1e1d1b; --muted:#6a655d; --line:#dedad2; --soft:#f8f7f4;
@@ -183,6 +183,77 @@ textarea.code{font-family:var(--mono);font-size:12.5px;min-height:360px;line-hei
 
 @media (max-width:900px){ .two,.two.flip,.bottom{grid-template-columns:1fr} }
 @media (prefers-reduced-motion:reduce){ *{scroll-behavior:auto!important} }
+
+/* 單一流程導覽 */
+.titlerow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.flow{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.fstep{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 14px 6px 6px;cursor:pointer;color:var(--muted);font-size:13.5px;position:relative}
+.fstep .no{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-family:var(--mono);border:1.5px solid var(--line);background:var(--soft)}
+.fstep.done .no{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.fstep.cur{color:var(--ink);font-weight:700;border-color:var(--accent)}
+.fstep.cur .no{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.fstep.open .no{border-style:dashed}
+.fstep.on{box-shadow:0 0 0 2px var(--accent);color:var(--ink)}
+.fstep:disabled{opacity:.45;cursor:default}
+.fstep .now{font-size:11px;font-weight:500;color:var(--accent-ink);background:var(--accent);border-radius:999px;padding:0 7px}
+.fstep:not(:last-child)::after{content:"";position:absolute;right:-6px;top:50%;width:6px;height:1.5px;background:var(--line)}
+.stagebar{display:flex;gap:10px 16px;align-items:center;flex-wrap:wrap;justify-content:space-between;padding:10px 0 2px;border-top:1px solid var(--line);margin-top:4px}
+.stagebar .hint{max-width:72ch}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+#tabBody{margin-top:2px}
+.aibar{display:flex;gap:8px 10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.aibar .sp{flex:1}
+.warnc{color:var(--s-review)!important}
+.badge{display:inline-block;min-width:18px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--accent-ink);color:var(--accent);font-size:11.5px;font-family:var(--mono)}
+.mini{border:1px solid var(--line);border-radius:6px;padding:7px 10px;font-size:13px;display:grid;gap:2px}
+.mini.un{border-style:dashed}
+.hero .in{padding:28px;justify-items:start}
+.pubrow{display:grid}
+.btn.big{padding:10px 16px;font-size:15px}
+.row{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.row.left{justify-content:flex-start}
+.clist{display:grid;gap:8px;margin-bottom:8px}
+.cm{border:1px solid var(--line);border-radius:6px;padding:7px 10px;font-size:13px;display:grid;gap:3px}
+.cm .meta{display:flex;gap:8px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.cm .meta b{color:var(--ink);font-weight:500}
+.cm .cst{margin-left:auto}
+.cm.open{border-left:3px solid var(--s-review)}
+.cm.resolved,.cm.ignored{opacity:.7}
+.cm .row{justify-content:flex-start;gap:12px}
+/* 對話框 */
+.modal{position:fixed;inset:0;background:color-mix(in srgb,var(--ink) 40%,transparent);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
+.mbox{background:var(--panel);border:1px solid var(--line);border-radius:10px;width:min(720px,100%);max-height:100%;height:min(760px,100%);display:flex;flex-direction:column;min-height:0}
+.mh{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.mh .sp{flex:1}
+.mbody{flex:1;overflow:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-height:0}
+.msg{max-width:88%;padding:9px 12px;border-radius:10px;display:grid;gap:4px}
+.msg.user{align-self:flex-end;background:var(--accent-soft)}
+.msg.ai{align-self:flex-start;background:var(--soft);border:1px solid var(--line)}
+.mtext{white-space:pre-wrap;word-break:break-word}
+.mlog{margin:0;padding-left:18px;font-size:12.5px;color:var(--muted)}
+.thinking{display:flex;align-items:center;gap:8px;color:var(--muted)}
+.spin{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);animation:sp 0.9s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+.mfoot{border-top:1px solid var(--line);padding:12px 16px;display:grid;gap:8px}
+.mfoot .crow{align-items:flex-end}
+.mfoot textarea{flex:1}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chipbtn{border:1px solid var(--line);background:var(--soft);border-radius:999px;padding:2px 10px;font-size:12.5px;cursor:pointer}
+.chipbtn:hover{border-color:var(--accent)}
+.chipbtn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chk{display:flex;gap:6px;align-items:center;font-size:13px}
+.vrow{display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--line);padding:8px 0}
+.vinfo{flex:1;min-width:0;font-size:13px}
+.busy{position:fixed;inset:0;background:color-mix(in srgb,var(--bg) 70%,transparent);display:flex;align-items:center;justify-content:center;z-index:30}
+.busy .card{padding:18px 22px;display:flex;gap:10px;align-items:center}
+/* 時間軸 */
+.day{display:grid;gap:6px;padding-bottom:10px}
+.dhd{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.06em;border-bottom:1px solid var(--line);padding-bottom:4px}
+.tli{display:grid;grid-template-columns:auto auto 1fr;gap:10px;align-items:baseline;font-size:13.5px}
+.tli .t{font-family:var(--mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tli .dot{transform:translateY(1px)}
+@media (max-width:900px){ .fstep{padding-right:10px} .fstep:not(:last-child)::after{display:none} .mbox{height:100%} }
 </style>
 </head>
 <body>
@@ -197,11 +268,12 @@ textarea.code{font-family:var(--mono);font-size:12.5px;min-height:360px;line-hei
   <div id="banner" class="banner" hidden></div>
   <div id="view"><p class="loading">讀取中…</p></div>
 </div>
+<div class="modal" id="modal" hidden><div class="mbox" id="modalBox" role="dialog" aria-modal="true"></div></div>
+<div class="busy" id="busy" hidden><div class="card"><span class="spin"></span><span id="busyMsg">處理中…</span></div></div>
 <div class="toast" id="toast" hidden></div>
-
 <script>
 /* ================= 共用 ================= */
-const PH = {collecting:'收集需求', organizing:'整理需求', drafting:'寫規格', developing:'開發中'};
+const PH = {collecting:'收集', organizing:'整理', drafting:'畫圖及規格', developing:'開發'};
 const PH_ORDER = ['collecting','organizing','drafting','developing'];
 const ST = {
   todo:{zh:'未開始',c:'--s-todo'}, working:{zh:'進行中',c:'--s-working'}, done:{zh:'完成',c:'--s-done'},
@@ -239,7 +311,7 @@ function parseLoose(text){
   return null;
 }
 
-let S = { user:'', isOwner:false, projects:[], project:null, tab:null, plan:null, dev:null, sel:null, tlFilter:null };
+let S = { user:'', isOwner:false, projects:[], project:null, view:null, plan:null, dev:null, sel:null, tlFilter:null, timeline:null };
 
 /* ================= 首頁：專案清單 ================= */
 async function loadHome(){
@@ -279,66 +351,333 @@ function renderHome(){
   }
 }
 
-/* ================= 專案頁 ================= */
+/* ================= 專案頁：單一流程 ================= */
+const STEPS = [['collecting','收集'],['organizing','整理'],['drafting','畫圖及規格'],['developing','開發'],['process','共用看過程']];
+const STAGE_HINT = {
+  collecting:'大家寫下想解決的問題或期望，看到一樣的就按「＋1」。',
+  organizing:'把需求歸納成主題，意見不同的地方列為「待決定」。',
+  drafting:'把主題畫成流程圖、寫下每一步的驗收標準。每個人都可以點節點提意見，管理者再用 AI 對話把意見整理進去。',
+  developing:'規格定稿後由 AI Agent 開發，進度、提問和產出物都在這裡。',
+  process:'從第一則需求到現在，整個專案發生過的事。'
+};
 function proj(){ return S.projects.find(p=>p.project===S.project)||{}; }
-async function openProject(id, tab){
-  S.project=id; S.sel=null; S.tlFilter=null; $('homeBtn').hidden=false;
+function phaseIdx(){ return PH_ORDER.indexOf(proj().status); }
+function canEdit(view){ return S.isOwner && view===proj().status; }
+
+async function openProject(id, view){
+  S.project=id; S.sel=null; S.tlFilter=null; S.timeline=null; $('homeBtn').hidden=false;
   if(google.script.history) google.script.history.replace(null,{project:id});
-  const p=proj();
-  S.tab = tab || ({collecting:'needs',organizing:'themes',drafting:'spec',developing:'dev'}[p.status]||'needs');
+  S.view = view || proj().status || 'collecting';
   await refreshProject();
 }
 async function refreshProject(){
-  const p=proj();
-  const jobs=[];
+  const p=proj(), jobs=[];
   if(!p.external) jobs.push(run('pagePlanning',S.project).then(r=>S.plan=r));
-  else S.plan={needs:[],themes:[],draft:'',info:null,round:1};
-  if(p.version>0) jobs.push(run('pageData',S.project).then(r=>S.dev=r));
-  else S.dev=null;
+  else S.plan={needs:[],themes:[],draft:'',drafts:[],chats:[],comments:[],round:1,info:null};
+  if(p.version>0) jobs.push(run('pageData',S.project).then(r=>S.dev=r)); else S.dev=null;
+  if(S.view==='process') jobs.push(run('pageTimeline',S.project).then(r=>S.timeline=r.items));
   await Promise.all(jobs);
   renderProject();
 }
+function stepState(key){
+  const cur=phaseIdx(), i=PH_ORDER.indexOf(key);
+  if(key==='process') return 'open';
+  if(i<cur) return 'done';
+  if(i===cur) return 'cur';
+  if(key==='developing'&&S.dev) return 'done';   // 新一輪進行中，上一版的開發仍可看
+  return 'future';
+}
 function renderProject(){
-  const p=proj(), cur=PH_ORDER.indexOf(p.status);
-  const tabs=[['needs','需求',roundNeeds(curRound()).length],['themes','整理',S.plan.themes.length],['spec','規格',''],['dev','開發','']];
+  const p=proj(), R=curRound();
   $('view').innerHTML=`
     <div class="pbar">
-      <h1>${esc(p.title||p.project)}</h1>
+      <div class="titlerow"><h1>${esc(p.title||p.project)}</h1>
+        ${R>1?`<span class="ver">第 ${R} 輪</span>`:''}${p.version?`<span class="ver">已上線 v${p.version}</span>`:''}</div>
       ${p.purpose?`<p class="purpose">${esc(p.purpose)}</p>`:''}
-      <div class="meta-line">
-        ${((S.plan&&S.plan.round)||p.round||1)>1?`<span class="ver">第 ${(S.plan&&S.plan.round)||p.round} 輪</span>`:''}
-        <div class="steps">${PH_ORDER.map((k,i)=>`<span class="step ${i<cur?'done':i===cur?'cur':''}"><span class="no">${i<cur?'✓':i+1}</span>${PH[k]}</span>`).join('')}</div>
-        ${p.due&&p.status==='collecting'?`<span>截止 ${esc(String(p.due).slice(0,10))}</span>`:''}
-        ${p.version?`<span class="ver">規格 v${p.version}</span>`:''}
-        ${S.isOwner?phaseButtons(p):''}
-      </div>
     </div>
-    <nav class="tabs" role="tablist">${tabs.map(([k,l,c])=>`<button class="tab ${S.tab===k?'on':''}" data-tab="${k}" role="tab">${l}${c?`<span class="c">${c}</span>`:''}</button>`).join('')}</nav>
-    <div id="tabBody" style="margin-top:14px"></div>`;
-  $('view').querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ S.tab=b.dataset.tab; renderProject(); });
+    <nav class="flow" aria-label="專案流程">${STEPS.map(([k,l],i)=>{ const st=stepState(k);
+      return `<button class="fstep ${st} ${S.view===k?'on':''}" data-view="${k}" ${st==='future'?'disabled':''} aria-current="${S.view===k?'step':'false'}">
+        <span class="no">${st==='done'?'✓':k==='process'?'◎':i+1}</span><span class="lb">${l}</span>${st==='cur'?'<span class="now">進行中</span>':''}</button>`; }).join('')}</nav>
+    <div class="stagebar">
+      <p class="hint">${STAGE_HINT[S.view]}${S.view!=='process'&&stepState(S.view)==='done'&&S.view!=='developing'?'　<b>這個階段已完成，內容僅供查看。</b>':''}</p>
+      <div class="acts">${S.isOwner?stageActions():''}</div>
+    </div>
+    <div id="tabBody"></div>`;
+  $('view').querySelectorAll('[data-view]').forEach(b=>b.onclick=async()=>{
+    S.view=b.dataset.view; S.sel=null;
+    if(S.view==='process'&&!S.timeline){ renderProject(); S.timeline=(await run('pageTimeline',S.project)).items; }
+    renderProject(); });
+  bindStageActions();
+  ({collecting:renderNeeds,organizing:renderThemes,drafting:renderSpec,developing:renderDev,process:renderProcess})[S.view]();
+}
+function stageActions(){
+  const st=proj().status, R=curRound(), b=[];
+  if(S.view!==st && !(S.view==='developing'&&st==='developing')) return '';
+  if(st==='collecting'){ if(R>1) b.push(`<button class="btn sm" id="cancelRound">取消這一輪</button>`); b.push(`<button class="btn primary" data-phase="organizing">完成收集，進入整理 →</button>`); }
+  if(st==='organizing'){ b.push(`<button class="btn sm" data-phase="collecting">← 退回收集</button>`,`<button class="btn primary" data-phase="drafting">完成整理，進入畫圖及規格 →</button>`); }
+  if(st==='drafting'){ b.push(`<button class="btn sm" data-phase="organizing">← 退回整理</button>`); }
+  if(st==='developing'){ b.push(`<button class="btn" id="nextRound">開始第 ${R+1} 輪需求</button>`); }
+  return b.join('');
+}
+function bindStageActions(){
+  $('view').querySelectorAll('[data-phase]').forEach(b=>b.onclick=async()=>{
+    const r=await act(b,'pageSetPhase',S.project,b.dataset.phase).catch(()=>null); if(!r) return;
+    S.plan=r; proj().status=b.dataset.phase; S.view=b.dataset.phase; S.timeline=null; renderProject(); toast('進入「'+PH[b.dataset.phase]+'」'); });
   const nr=$('nextRound'); if(nr) nr.onclick=async()=>{
-    if(nr.dataset.armed!=='1'){ nr.dataset.armed='1'; nr.textContent='再按一次：回到收集需求（開發進度會保留）'; return; }
+    if(nr.dataset.armed!=='1'){ nr.dataset.armed='1'; nr.textContent='再按一次：回到收集（開發進度會保留）'; return; }
     const r=await act(nr,'pageNextRound',S.project).catch(()=>null); if(!r) return;
-    S.plan=r; Object.assign(proj(),{status:'collecting',round:r.round,external:false}); S.tab='needs'; renderProject(); toast(`第 ${r.round} 輪開始收集需求`); };
+    S.plan=r; Object.assign(proj(),{status:'collecting',round:r.round,external:false}); S.view='collecting'; S.timeline=null; renderProject(); toast(`第 ${r.round} 輪開始收集需求`); };
   const cr=$('cancelRound'); if(cr) cr.onclick=async()=>{
     if(cr.dataset.armed!=='1'){ cr.dataset.armed='1'; cr.textContent='再按一次確定取消'; return; }
     const r=await act(cr,'pageCancelRound',S.project).catch(()=>null); if(!r) return;
-    S.plan=r; Object.assign(proj(),{status:'developing',round:r.round}); S.tab='dev'; renderProject(); toast('已取消，回到開發中'); };
-  $('view').querySelectorAll('[data-phase]').forEach(b=>b.onclick=async()=>{
-    const r=await act(b,'pageSetPhase',S.project,b.dataset.phase).catch(()=>null); if(!r) return;
-    S.plan=r; proj().status=b.dataset.phase; S.tab={collecting:'needs',organizing:'themes',drafting:'spec'}[b.dataset.phase]; renderProject(); toast('已切換到「'+PH[b.dataset.phase]+'」');
-  });
-  ({needs:renderNeeds,themes:renderThemes,spec:renderSpec,dev:renderDev})[S.tab]();
-}
-function phaseButtons(p){
-  const status=p.status, i=PH_ORDER.indexOf(status), b=[], R=(S.plan&&S.plan.round)||p.round||1;
-  if(status==='developing') return `<button class="btn sm primary" id="nextRound">開始第 ${R+1} 輪需求</button>`;
-  if(i===0&&R>1) b.push(`<button class="btn sm" id="cancelRound">取消這一輪</button>`);
-  if(i>0) b.push(`<button class="btn sm" data-phase="${PH_ORDER[i-1]}">退回「${PH[PH_ORDER[i-1]]}」</button>`);
-  if(i<2) b.push(`<button class="btn sm primary" data-phase="${PH_ORDER[i+1]}">進入「${PH[PH_ORDER[i+1]]}」</button>`);
-  return b.join('');
+    S.plan=r; Object.assign(proj(),{status:'developing',round:r.round}); S.view='developing'; S.timeline=null; renderProject(); toast('已取消，回到開發'); };
 }
 
+/* ---------- ② 整理 ---------- */
+function renderThemes(){
+  const edit=canEdit('organizing'), themes=S.plan.themes, needs=roundNeeds(curRound());
+  const nmap=Object.fromEntries(S.plan.needs.map(n=>[n.id,n]));
+  const unassigned=needs.filter(n=>!themeOf(n.id));
+  const aiBar = edit ? `<div class="aibar">
+      ${themes.length?`<button class="btn primary" id="openThemeChat">與 AI 對話修改主題</button>`:`<button class="btn primary" id="aiThemes" ${needs.length?'':'disabled'}>AI 整理 ${needs.length} 則需求</button>`}
+      <button class="btn" id="addTheme">手動新增主題</button>
+      ${S.plan.aiReady?'':`<span class="hint warnc">還沒設定 Gemini API key，AI 功能無法使用。</span>`}
+    </div>` : '';
+  $('tabBody').innerHTML=`${aiBar}<div class="two">
+    <div class="list">
+      ${themes.length?themes.map((t,i)=>`<article class="theme">
+        <div class="tt">${esc(t.title)}</div>
+        ${t.summary?`<div>${esc(t.summary)}</div>`:''}
+        <div class="src">${(t.needIds||[]).map(id=>`<span class="chip" title="${esc(nmap[id]?(nmap[id].topic+'：'+(nmap[id].pain||nmap[id].want)):'找不到這則需求')}">${esc(nmap[id]?nmap[id].topic:id)}${nmap[id]&&nmap[id].plus.length?` +${nmap[id].plus.length}`:''}</span>`).join('')}</div>
+        ${t.conflict?`<div class="conflict"><b>待決定：</b>${esc(t.conflict)}</div>`:''}
+        ${t.decision?`<div class="decision"><b>決定：</b>${esc(t.decision)}</div>`:''}
+        ${edit?`<div><button class="linkbtn" data-tedit="${i}">${t.conflict&&!t.decision?'填寫決定 / 編輯':'編輯'}</button></div><div class="tedit" id="te_${i}" hidden>
+          <label class="f"><span>主題名稱</span><input type="text" data-k="title" value="${esc(t.title)}"></label>
+          <label class="f"><span>說明</span><textarea data-k="summary" rows="2">${esc(t.summary)}</textarea></label>
+          <label class="f"><span>來源需求編號（逗號分隔）</span><input type="text" data-k="needIds" value="${esc((t.needIds||[]).join(', '))}"></label>
+          <label class="f"><span>意見衝突（待決定）</span><textarea data-k="conflict" rows="2">${esc(t.conflict)}</textarea></label>
+          <label class="f"><span>決定（會帶進規格的「已決定事項」）</span><textarea data-k="decision" rows="2">${esc(t.decision)}</textarea></label>
+          <div class="row"><button class="btn sm" data-tdel="${i}">刪除主題</button><button class="btn sm primary" data-tsave="${i}">儲存</button></div>
+        </div>`:''}
+      </article>`).join(''):`<div class="card"><div class="in"><p class="empty">${edit?'按上方「AI 整理」，AI 會把這一輪的需求歸納成主題。':'管理者整理後，主題會出現在這裡。'}</p></div></div>`}
+    </div>
+    <section class="card"><h2>本輪需求<span class="sp"></span><span class="who2">${needs.length} 則${unassigned.length&&themes.length?` · ${unassigned.length} 則未歸類`:''}</span></h2>
+      <div class="in list">${needs.length?needs.slice().sort((a,b)=>b.plus.length-a.plus.length).map(n=>`<div class="mini ${themeOf(n.id)?'':'un'}"><b>${esc(n.topic)}</b>${n.plus.length?` <span class="who2">+${n.plus.length}</span>`:''}<div class="hint">${esc(n.pain||n.want)}</div>${themeOf(n.id)?'':`<span class="tag">未歸類</span>`}</div>`).join(''):'<p class="empty">這一輪沒有需求。</p>'}</div>
+    </section></div>`;
+  if(!edit) return;
+  const ai=$('aiThemes'); if(ai) ai.onclick=async()=>{ busy(true,'AI 正在整理需求…'); try{ S.plan=await run('pageThemesChat',S.project,''); renderProject(); toast(`整理出 ${S.plan.themes.length} 個主題`); }catch(e){ toast(e.message||'AI 整理失敗'); } busy(false); };
+  const oc=$('openThemeChat'); if(oc) oc.onclick=()=>openChat('themes');
+  $('addTheme').onclick=async e=>{ const list=themes.concat([{id:'t'+Date.now().toString(36),title:'新主題',summary:'',needIds:[],conflict:'',decision:''}]);
+    const r=await act(e.target,'pageSaveThemes',S.project,list).catch(()=>null); if(r){ S.plan=r; renderProject(); const el=$('te_'+(r.themes.length-1)); if(el){ el.hidden=false; el.querySelector('input').focus(); } } };
+  $('tabBody').querySelectorAll('[data-tedit]').forEach(b=>b.onclick=()=>{ const el=$('te_'+b.dataset.tedit); el.hidden=!el.hidden; });
+  $('tabBody').querySelectorAll('[data-tsave]').forEach(b=>b.onclick=async()=>{
+    const i=+b.dataset.tsave, el=$('te_'+i), t={...themes[i]};
+    el.querySelectorAll('[data-k]').forEach(x=>{ t[x.dataset.k]= x.dataset.k==='needIds' ? x.value.split(/[,，\s]+/).filter(Boolean) : x.value; });
+    const list=themes.slice(); list[i]=t; const r=await act(b,'pageSaveThemes',S.project,list).catch(()=>null); if(r){ S.plan=r; renderProject(); toast('已儲存'); } });
+  $('tabBody').querySelectorAll('[data-tdel]').forEach(b=>b.onclick=async()=>{
+    if(b.dataset.armed!=='1'){ b.dataset.armed='1'; b.textContent='再按一次確定刪除'; return; }
+    const r=await act(b,'pageSaveThemes',S.project,themes.filter((_,i)=>i!==+b.dataset.tdel)).catch(()=>null); if(r){ S.plan=r; renderProject(); toast('已刪除'); } });
+}
+
+/* ---------- ③ 畫圖及規格 ---------- */
+function draftSpec(){ return parseLoose(S.plan.draft||''); }
+function openComments(node){ return (S.plan.comments||[]).filter(c=>c.status==='open'&&(node===undefined||c.node===node)); }
+function renderSpec(){
+  const p=proj(), cur=p.status==='drafting', edit=canEdit('drafting');
+  const spec = cur||!S.dev ? draftSpec() : S.dev.spec;
+  const base = cur&&S.dev ? S.dev.spec : null, dl = base&&spec&&spec.nodes ? specDiff(base,spec) : null;
+  const lastDraft=(S.plan.drafts||[]).slice(-1)[0], nOpen=openComments().length;
+  if(!spec||!spec.nodes||!spec.nodes.length){
+    $('tabBody').innerHTML=`<div class="card hero"><div class="in">
+      <p class="empty">${edit?'還沒有流程圖。AI 會依照主題、決定事項和需求，畫出初版流程與每一步的驗收標準。':'管理者產生流程圖後，會出現在這裡，到時可以點每個步驟提意見。'}</p>
+      ${edit?`<div><button class="btn primary" id="aiSpec" ${S.plan.aiReady?'':'disabled'}>AI 畫出初版流程圖</button></div>${S.plan.aiReady?'':'<p class="hint warnc">還沒設定 Gemini API key，AI 功能無法使用。</p>'}`:''}
+    </div></div>`;
+    const b=$('aiSpec'); if(b) b.onclick=async()=>{ busy(true,'AI 正在畫流程圖、寫驗收標準…（約 20–60 秒）'); try{ S.plan=await run('pageSpecChat',S.project,'',false); renderProject(); toast('初版流程圖完成'); }catch(e){ toast(e.message||'AI 產生失敗'); } busy(false); };
+    return;
+  }
+  const info=id=>{ const n=spec.nodes.find(x=>x.id===id), c=cur?openComments(id).length:0; return {sub:(TYPE_ZH[n.type]||n.type)+(n.locked&&cur?' · 已鎖定':''), q:c?`${c} 則意見`:''}; };
+  const w=lint(spec);
+  $('tabBody').innerHTML=`
+    ${cur?`<div class="aibar">
+      <span class="ver">草稿 v${lastDraft?lastDraft.v:1}</span><span class="hint">${lastDraft?esc(fmt(lastDraft.ts)+' · '+who(lastDraft.by)+'：'+lastDraft.note):''}</span>
+      <span class="sp"></span>
+      ${edit?`<button class="btn" id="openVers">版本紀錄</button><button class="btn primary" id="openSpecChat">AI 對話整理意見${nOpen?`<span class="badge">${nOpen}</span>`:''}</button>`:''}
+    </div>`:''}
+    <div class="two">
+      <div class="list">
+        <section class="card"><h2>流程圖<span class="sp"></span><span class="who2">${spec.nodes.length} 個步驟 · 點選步驟查看或提意見</span></h2><div class="graph" id="specGraph"></div></section>
+        ${dl?`<section class="card"><h2>和已上線 v${S.dev.version} 的差異</h2><div class="in">${dl.length?`<ul class="diff">${dl.map(d=>`<li class="${d.k}">${d.k==='add'?'＋ 新增':d.k==='chg'?'～ 修改':'－ 刪除'}　${esc(d.label)}</li>`).join('')}</ul>`:`<p class="hint">和 v${S.dev.version} 完全一樣。</p>`}</div></section>`:''}
+        <section class="card"><h2>規格檢查</h2><div class="in">${w.length?`<ul class="warn">${w.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:`<p class="ok">✓ 步驟、連線、輸入輸出、驗收標準都沒有問題</p>`}
+          ${spec.decisions&&spec.decisions.length?`<div class="decision"><b>已決定：</b>${spec.decisions.map(esc).join('；')}</div>`:''}</div></section>
+        ${edit?`<div id="pubBox" class="pubrow"><button class="btn primary big" id="pubBtn">定稿並發布 v${(p.version||0)+1}，交給 AI Agent 開發</button></div>`:''}
+      </div>
+      <section class="card" id="nodePanel"></section>
+    </div>`;
+  const g=$('specGraph'); const draw=()=>{ g.innerHTML=graphSvg(spec,info,S.sel); };
+  draw();
+  g.onclick=e=>{ const n=e.target.closest('.node'); if(!n) return; S.sel=n.dataset.id; draw(); renderNodePanel(spec,cur,edit); };
+  g.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ const n=e.target.closest('.node'); if(n){ e.preventDefault(); n.dispatchEvent(new MouseEvent('click',{bubbles:true})); } } };
+  renderNodePanel(spec,cur,edit);
+  if(!edit) return;
+  $('openSpecChat').onclick=()=>openChat('spec');
+  $('openVers').onclick=openVersions;
+  $('pubBtn').onclick=()=>{
+    $('pubBox').innerHTML=`<div class="confirm"><b>確定定稿嗎？</b><span class="hint">AI Agent 會依這份規格${base?'更新，只重做有變動的步驟':'開始開發'}，專案進入「開發」。</span>
+      ${w.length?`<span class="hint warnc">規格檢查還有 ${w.length} 個提醒。</span>`:''}${nOpen?`<span class="hint warnc">還有 ${nOpen} 則同事意見沒有處理。</span>`:''}
+      <div class="row"><button class="btn" id="pubNo">取消</button><button class="btn primary" id="pubYes">確定發布</button></div></div>`;
+    $('pubNo').onclick=()=>renderProject();
+    $('pubYes').onclick=async e=>{ const r=await act(e.target,'pagePublish',S.project).catch(()=>null); if(!r) return;
+      toast(`已發布 v${r.version}`); await loadHome(); openProject(S.project,'developing'); };
+  };
+}
+function renderNodePanel(spec,cur,edit){
+  const box=$('nodePanel'), n=spec.nodes.find(x=>x.id===S.sel);
+  const cmts=(S.plan.comments||[]).filter(c=>c.node===(n?n.id:''));
+  const cmtHtml=`<div class="sec"><h3>${n?'對這一步的意見':'對整體規格的意見'}</h3>
+    ${cmts.length?`<div class="clist">${cmts.map(c=>`<div class="cm ${c.status}"><div class="meta"><b>${esc(who(c.author))}</b><span>${fmt(c.ts)}</span><span class="cst">${c.status==='open'?'待處理':c.status==='resolved'?'已處理':'不採納'}</span></div>
+      <div>${esc(c.text)}</div>${c.note?`<div class="hint">${esc(c.note)}</div>`:''}
+      ${edit?`<div class="row">${c.status==='open'?`<button class="linkbtn" data-cs="${c.id}" data-to="ignored">不採納</button><button class="linkbtn" data-cs="${c.id}" data-to="resolved">標為已處理</button>`:`<button class="linkbtn" data-cs="${c.id}" data-to="open">重新打開</button>`}</div>`:''}</div>`).join('')}</div>`:`<p class="empty">還沒有意見。</p>`}
+    ${cur?`<div class="crow"><input type="text" id="cmIn" placeholder="${n?'例：這一步也要通知主任':'例：整個流程少了請假的情況'}" aria-label="提出意見"><button class="btn sm primary" id="cmSend">送出</button></div>`:''}</div>`;
+  if(!n){
+    box.innerHTML=`<h2>${cur?'提意見':'說明'}</h2><div class="detail"><p class="hint">點流程圖上的步驟，可以看說明、驗收標準，並針對那一步提意見。${edit?'管理者可以手動修改步驟；手動改過的步驟會自動鎖定，AI 不會再動它。':''}</p>
+      ${spec.openQuestions&&spec.openQuestions.length?`<div class="conflict"><b>待決定：</b>${spec.openQuestions.map(esc).join('；')}</div>`:''}
+      ${cur?`<p class="hint">目前共有 <b>${openComments().length}</b> 則意見待處理。</p>`:''}${cmtHtml}</div>`;
+  } else {
+    const outs=(spec.edges||[]).filter(e=>e.from===n.id).map(e=>{ const t=spec.nodes.find(x=>x.id===e.to); return (e.label?e.label+' → ':'')+(t?t.label:e.to); });
+    box.innerHTML=`<h2>步驟詳情<span class="sp"></span><button class="linkbtn" id="unsel">回到整體</button></h2><div class="detail">
+      <div><p class="ttl">${esc(n.label)}</p><span class="id">${esc(n.id)} · ${TYPE_ZH[n.type]||n.type}${n.locked&&cur?' · 已鎖定':''}</span></div>
+      ${n.description?`<div>${esc(n.description)}</div>`:''}
+      <dl class="kv">${n.inputs&&n.inputs.length?`<dt>需要</dt><dd>${n.inputs.map(esc).join('、')}</dd>`:''}${n.outputs&&n.outputs.length?`<dt>產出</dt><dd>${n.outputs.map(esc).join('、')}</dd>`:''}${outs.length?`<dt>下一步</dt><dd>${outs.map(esc).join('<br>')}</dd>`:''}</dl>
+      ${n.acceptance&&n.acceptance.length?`<div class="sec"><h3>驗收標準</h3><ul class="acc">${n.acceptance.map(a=>`<li><span class="aid">${esc(a.id)}</span><span>${esc(a.text)}</span></li>`).join('')}</ul></div>`:''}
+      ${edit?`<div class="row left"><button class="btn sm" id="nEdit">手動修改</button><button class="btn sm" id="nLock">${n.locked?'解除鎖定':'鎖定（AI 不改）'}</button><button class="btn sm" id="nAdd">在後面新增步驟</button><button class="btn sm" id="nDel">刪除</button></div>
+      <form class="tedit" id="nForm" hidden>
+        <label class="f"><span>名稱</span><input type="text" id="nf_label" value="${esc(n.label)}"></label>
+        <label class="f"><span>類型</span><select id="nf_type">${Object.entries(TYPE_ZH).map(([k,v])=>`<option value="${k}" ${k===n.type?'selected':''}>${v}</option>`).join('')}</select></label>
+        <label class="f"><span>說明</span><textarea id="nf_desc" rows="2">${esc(n.description||'')}</textarea></label>
+        <label class="f"><span>需要的資料（逗號分隔）</span><input type="text" id="nf_in" value="${esc((n.inputs||[]).join(', '))}"></label>
+        <label class="f"><span>產出的資料（逗號分隔）</span><input type="text" id="nf_out" value="${esc((n.outputs||[]).join(', '))}"></label>
+        <label class="f"><span>驗收標準（一行一條）</span><textarea id="nf_acc" rows="4">${esc((n.acceptance||[]).map(a=>a.text).join('\n'))}</textarea></label>
+        <div class="row"><button type="button" class="btn sm" id="nfCancel">取消</button><button class="btn sm primary" id="nfSave">儲存（會自動鎖定）</button></div>
+      </form>`:''}
+      ${cmtHtml}</div>`;
+    $('unsel').onclick=()=>{ S.sel=null; $('specGraph').querySelectorAll('.node.sel').forEach(x=>x.classList.remove('sel')); renderNodePanel(spec,cur,edit); };
+  }
+  const send=$('cmSend'); if(send){ const inp=$('cmIn');
+    const go=async()=>{ if(!inp.value.trim()) return; const r=await act(send,'pageAddComment',S.project,n?n.id:'',inp.value).catch(()=>null); if(r){ S.plan=r; renderProject(); toast('意見已送出'); } };
+    send.onclick=go; inp.onkeydown=e=>{ if(e.key==='Enter'&&!e.isComposing){ e.preventDefault(); go(); } }; }
+  box.querySelectorAll('[data-cs]').forEach(b=>b.onclick=async()=>{ const r=await act(b,'pageSetCommentStatus',S.project,b.dataset.cs,b.dataset.to).catch(()=>null); if(r){ S.plan=r; renderProject(); } });
+  if(!(edit&&n)) return;
+  const split=v=>v.split(/[,，\s]+/).filter(Boolean);
+  $('nEdit').onclick=()=>{ $('nForm').hidden=false; $('nf_label').focus(); };
+  $('nfCancel').onclick=()=>{ $('nForm').hidden=true; };
+  $('nForm').onsubmit=async e=>{ e.preventDefault();
+    const patch={label:$('nf_label').value.trim()||n.label,type:$('nf_type').value,description:$('nf_desc').value.trim(),inputs:split($('nf_in').value),outputs:split($('nf_out').value),
+      acceptance:$('nf_acc').value.split('\n').map(x=>x.trim()).filter(Boolean).map((t,i)=>({id:'a'+(i+1),text:t}))};
+    const r=await act($('nfSave'),'pageEditNode',S.project,n.id,patch).catch(()=>null); if(r){ S.plan=r; renderProject(); toast('已儲存，這一步已鎖定'); } };
+  $('nLock').onclick=async e=>{ const r=await act(e.target,'pageEditNode',S.project,n.id,{locked:!n.locked}).catch(()=>null); if(r){ S.plan=r; renderProject(); } };
+  $('nAdd').onclick=async e=>{ const r=await act(e.target,'pageEditNode',S.project,'',{newNode:{label:'新步驟',type:'tool'},after:n.id}).catch(()=>null);
+    if(r){ S.plan=r; const d=draftSpec(); S.sel=d.nodes[d.nodes.length-1].id; renderProject(); $('nForm')&&($('nForm').hidden=false); } };
+  $('nDel').onclick=async e=>{ const b=e.target; if(b.dataset.armed!=='1'){ b.dataset.armed='1'; b.textContent='再按一次確定刪除'; return; }
+    const r=await act(b,'pageEditNode',S.project,n.id,null).catch(()=>null); if(r){ S.plan=r; S.sel=null; renderProject(); toast('已刪除'); } };
+}
+
+/* ---------- 彈出式對話框（整理／規格共用） ---------- */
+function openChat(stage){
+  const m=$('modal'); m.hidden=false; m.dataset.stage=stage; renderChat();
+  setTimeout(()=>{ const t=$('chatIn'); t&&t.focus(); },50);
+}
+function closeModal(){ $('modal').hidden=true; $('modalBox').innerHTML=''; }
+function renderChat(pending){
+  const stage=$('modal').dataset.stage, isSpec=stage==='spec';
+  const msgs=(S.plan.chats||[]).filter(c=>c.stage===stage);
+  const nOpen=isSpec?openComments().length:0;
+  const chips=isSpec?['把同事的意見整理進去','檢查驗收標準是否具體、可測試','流程太複雜，幫我簡化','補上例外情況的處理']:['重新整理全部需求','合併意思相近的主題','把衝突的意見拆得更清楚'];
+  $('modalBox').innerHTML=`<div class="mh"><b>${isSpec?'AI 對話：整理意見、修改規格':'AI 對話：修改主題'}</b><span class="sp"></span><button class="btn sm" id="mClose">關閉</button></div>
+    <div class="mbody" id="mBody">
+      ${msgs.length?'':`<p class="hint">${isSpec?'告訴 AI 要怎麼改。勾選「納入同事意見」時，AI 會逐則判斷：採納的改進草稿，不採納的說明原因。AI 只會改有提到的步驟，鎖定的步驟不會動，每次修改都會存成新的草稿版本。':'告訴 AI 要怎麼調整主題。沒提到的主題會保持原樣，你填的「決定」也會保留。'}</p>`}
+      ${msgs.map(c=>`<div class="msg ${c.role}"><div class="mtext">${esc(c.text)}</div>${c.log&&c.log.length?`<ul class="mlog">${c.log.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`:''}<div class="who2">${c.role==='ai'?'AI':esc(who(c.author))} · ${fmt(c.ts)}</div></div>`).join('')}
+      ${pending?`<div class="msg user"><div class="mtext">${esc(pending)}</div></div><div class="msg ai thinking"><span class="spin"></span>AI 修改中…（約 10–60 秒）</div>`:''}
+    </div>
+    <div class="mfoot">
+      <div class="chips">${chips.map(c=>`<button class="chipbtn" data-chip="${esc(c)}" ${pending?'disabled':''}>${esc(c)}</button>`).join('')}</div>
+      ${isSpec?`<label class="chk"><input type="checkbox" id="incC" ${nOpen?'checked':''} ${nOpen?'':'disabled'}> 納入未處理的同事意見（${nOpen} 則）</label>`:''}
+      <div class="crow"><textarea id="chatIn" rows="2" placeholder="${isSpec?'例：通知班導那一步，改成下課後才通知':'例：把「菜單」和「過敏」合成一個主題'}" ${pending?'disabled':''}></textarea><button class="btn primary" id="chatSend" ${pending?'disabled':''}>送出</button></div>
+    </div>`;
+  const body=$('mBody'); body.scrollTop=body.scrollHeight;
+  $('mClose').onclick=closeModal;
+  if(pending) return;
+  const send=async text=>{
+    const t=(text||'').trim(), inc=isSpec&&$('incC')&&$('incC').checked;
+    if(!t&&!inc){ $('chatIn').focus(); return; }
+    renderChat(t||'把同事的意見整理進去');
+    try{ S.plan = isSpec ? await run('pageSpecChat',S.project,t,!!inc) : await run('pageThemesChat',S.project,t); renderProject(); renderChat(); }
+    catch(e){ renderChat(); toast(e.message||'AI 修改失敗，請再試一次'); $('chatIn').value=t; }
+  };
+  $('chatSend').onclick=()=>send($('chatIn').value);
+  $('chatIn').onkeydown=e=>{ if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){ e.preventDefault(); send($('chatIn').value); } };
+  $('modalBox').querySelectorAll('[data-chip]').forEach(b=>b.onclick=()=>send(b.dataset.chip));
+}
+function openVersions(){
+  const m=$('modal'); m.hidden=false; m.dataset.stage='versions';
+  const list=(S.plan.drafts||[]).slice().reverse(), curV=list.length?list[0].v:0;
+  $('modalBox').innerHTML=`<div class="mh"><b>草稿版本紀錄</b><span class="sp"></span><button class="btn sm" id="mClose">關閉</button></div>
+    <div class="mbody">${list.length?list.map(d=>`<div class="vrow"><span class="ver">v${d.v}</span><div class="vinfo"><div>${esc(d.note)}</div><div class="who2">${fmt(d.ts)} · ${esc(who(d.by))}</div></div>
+      ${d.v===curV?'<span class="tag">目前</span>':`<button class="btn sm" data-restore="${d.v}">退回這版</button>`}</div>`).join(''):'<p class="empty">還沒有版本。</p>'}</div>`;
+  $('mClose').onclick=closeModal;
+  $('modalBox').querySelectorAll('[data-restore]').forEach(b=>b.onclick=async()=>{
+    if(b.dataset.armed!=='1'){ b.dataset.armed='1'; b.textContent='再按一次確定'; return; }
+    const r=await act(b,'pageRestoreDraft',S.project,+b.dataset.restore).catch(()=>null); if(r){ S.plan=r; closeModal(); renderProject(); toast(`已退回 v${b.dataset.restore}（存成新版本）`); } });
+}
+function busy(on,msg){ const o=$('busy'); o.hidden=!on; if(on) $('busyMsg').textContent=msg||'處理中…'; }
+
+/* ---------- ⑤ 共用看過程 ---------- */
+const KIND = {
+  project:['專案','--accent'], phase:['專案','--accent'], round:['專案','--accent'],
+  need:['收集','--s-working'], themes:['整理','--s-review'],
+  draft:['規格','--s-done'], comment:['規格','--s-done'], publish:['規格','--s-done'],
+  dev:['開發','--s-blocked'], answer:['開發','--s-blocked']
+};
+function renderProcess(){
+  if(!S.timeline){ $('tabBody').innerHTML='<p class="loading">讀取中…</p>'; return; }
+  const groups=['全部','收集','整理','規格','開發','專案'], f=S.pFilter||'全部';
+  const items=S.timeline.filter(i=>f==='全部'||(KIND[i.kind]||['專案'])[0]===f).slice().reverse();
+  const byDay={}; items.forEach(i=>{ const d=new Date(i.ts); const k=isNaN(d)?'':`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`; (byDay[k]=byDay[k]||[]).push(i); });
+  $('tabBody').innerHTML=`<div class="chips" style="margin-bottom:12px">${groups.map(g=>`<button class="chipbtn ${g===f?'on':''}" data-g="${g}">${g}${g==='全部'?'':` · ${S.timeline.filter(i=>(KIND[i.kind]||['專案'])[0]===g).length}`}</button>`).join('')}</div>
+    <section class="card"><div class="in">${items.length?Object.entries(byDay).map(([d,l])=>`<div class="day"><div class="dhd">${esc(d)}</div>${l.map(i=>{ const k=KIND[i.kind]||['專案','--accent'];
+      return `<div class="tli"><span class="t">${fmt(i.ts).slice(6)}</span><i class="dot" style="background:var(${k[1]})"></i><div><span class="tag">${k[0]}</span> <b>${esc(who(i.actor))}</b> ${esc(i.text)}</div></div>`; }).join('')}</div>`).join(''):'<p class="empty">還沒有任何紀錄。</p>'}</div></section>`;
+  $('tabBody').querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{ S.pFilter=b.dataset.g; renderProcess(); });
+}
+
+/* ---------- 流程圖（共用） ---------- */
+function layout(spec){
+  const ids=spec.nodes.map(n=>n.id), layer={}; ids.forEach(i=>layer[i]=0);
+  for(let k=0;k<ids.length;k++) (spec.edges||[]).forEach(e=>{ if(layer[e.from]!=null&&layer[e.to]!=null&&layer[e.to]<layer[e.from]+1) layer[e.to]=layer[e.from]+1; });
+  const cols={}; spec.nodes.forEach(n=>{ (cols[layer[n.id]]=cols[layer[n.id]]||[]).push(n.id); });
+  const W=150,H=58,GX=56,GY=34,PX=16,PY=26,pos={};
+  const maxRows=Math.max(...Object.values(cols).map(c=>c.length));
+  Object.entries(cols).forEach(([l,c])=>{ const off=(maxRows-c.length)*(H+GY)/2; c.forEach((id,i)=>pos[id]={x:PX+l*(W+GX),y:PY+off+i*(H+GY),w:W,h:H}); });
+  return {pos,cw:PX*2+Object.keys(cols).length*(W+GX)-GX,ch:PY+16+maxRows*(H+GY)-GY};
+}
+/* info(id) → {c:狀態色 token, zh:狀態文字} 或 {sub:灰字說明}；q：右下角提示 */
+function graphSvg(spec, info, selId){
+  const {pos,cw,ch}=layout(spec);
+  let s=`<svg viewBox="0 0 ${cw} ${ch}" style="width:100%;min-width:${Math.round(cw*0.72)}px;max-width:${cw}px;height:auto" role="img" aria-label="流程圖"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" style="fill:var(--muted)"/></marker></defs>`;
+  (spec.edges||[]).forEach(e=>{ const a=pos[e.from], b=pos[e.to]; if(!a||!b) return;
+    const x1=a.x+a.w, y1=a.y+a.h/2, x2=b.x-2, y2=b.y+b.h/2, dx=Math.max(30,(x2-x1)/2);
+    s+=`<path class="edge" d="M${x1},${y1} C${x1+dx},${y1} ${x2-dx},${y2} ${x2},${y2}" marker-end="url(#ar)"/>`;
+    if(e.label) s+=`<text class="etxt" x="${b.x+2}" y="${b.y-7}">${esc(e.label)} ▸</text>`; });
+  spec.nodes.forEach(n=>{ const p=pos[n.id], i=info(n.id)||{};
+    s+=`<g class="node${selId===n.id?' sel':''}" data-id="${esc(n.id)}" tabindex="0" role="button" aria-label="${esc(n.label)}">
+      <rect class="box" x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="7"/>
+      <rect x="${p.x}" y="${p.y}" width="6" height="${p.h}" rx="3" style="fill:var(${i.c||'--line'})"/>
+      <text class="lb" x="${p.x+16}" y="${p.y+24}">${esc(n.label||n.id)}</text>
+      ${i.c?`<circle cx="${p.x+20}" cy="${p.y+41}" r="4" style="fill:var(${i.c})"/><text class="st" x="${p.x+30}" y="${p.y+45}" style="fill:var(${i.c})">${esc(i.zh)}</text>`
+        :`<text class="st" x="${p.x+16}" y="${p.y+45}" style="fill:var(--muted)">${esc(i.sub||TYPE_ZH[n.type]||n.type)}</text>`}
+      ${i.q?`<text class="q" x="${p.x+p.w-10}" y="${p.y+45}" text-anchor="end">${esc(i.q)}</text>`:''}
+    </g>`; });
+  return s+'</svg>';
+}
+function legendHtml(){ return `<div class="legend">${Object.values(ST).map(v=>`<span><i class="dot" style="background:var(${v.c})"></i>${v.zh}</span>`).join('')}</div>`; }
 /* ---------- ② 需求 ---------- */
 function themeOf(nid){ return S.plan.themes.find(t=>(t.needIds||[]).includes(nid)); }
 function needCard(n, opts={}){
@@ -358,7 +697,7 @@ function needCard(n, opts={}){
 function curRound(){ return (S.plan&&S.plan.round)||proj().round||1; }
 function roundNeeds(r){ return S.plan.needs.filter(n=>(n.round||1)===r); }
 function renderNeeds(){
-  const p=proj(), open=p.status==='collecting'||S.isOwner, R=curRound();
+  const p=proj(), open=p.status==='collecting', R=curRound();
   const sort=a=>a.slice().sort((x,y)=>y.plus.length-x.plus.length||String(y.ts).localeCompare(String(x.ts)));
   const cur=sort(roundNeeds(R)), older=[];
   for(let r=R-1;r>=1;r--){ const l=roundNeeds(r); if(l.length) older.push([r,sort(l)]); }
@@ -395,110 +734,6 @@ function bindNeedActions(){
   });
 }
 
-/* ---------- ③ 整理 ---------- */
-function themesPrompt(){
-  const p=proj();
-  const R=curRound();
-  const lines=roundNeeds(R).map(n=>`[${n.id}] 主題：${n.topic||'—'}（${who(n.author)}，${n.plus.length} 人附議）\n問題：${n.pain||'—'}\n希望：${n.want||'—'}${n.comments.length?'\n留言：'+n.comments.map(c=>who(c.by)+'：'+c.text).join('／'):''}`).join('\n\n');
-  return `你是需求分析師。以下是同事對「${p.title}」提出的${R>1?`第 ${R} 輪（系統已上線 v${p.version}，這些是新增或修改的）`:''}需求${p.purpose?`（專案目的：${p.purpose}）`:''}。
-
-請歸納成 3 到 7 個主題。規則：
-1. 每個主題要列出來源需求編號（needIds），一則需求可以屬於多個主題
-2. 同事之間意見衝突的地方不要合併成模糊的說法，要寫在 conflict 欄位，例如「A 希望自動回覆，B 擔心回錯」，交給人決定
-3. 不要加入需求裡沒有提到的內容
-4. 附議人數多的需求要特別反映在 summary
-5. 用繁體中文、白話
-
-只回覆一個 JSON，不要其他文字：
-{"themes":[{"title":"主題名稱（10 字內）","summary":"這個主題要解決什麼（1-2 句）","needIds":["n…"],"conflict":"沒有衝突就留空字串"}]}
-
-需求：
-
-${lines}`;
-}
-function renderThemes(){
-  const owner=S.isOwner, themes=S.plan.themes, needs=roundNeeds(curRound());
-  const unassigned=needs.filter(n=>!themeOf(n.id));
-  const nmap=Object.fromEntries(needs.map(n=>[n.id,n]));
-  $('tabBody').innerHTML=`<div class="two">
-    <div class="list">
-      ${themes.length?themes.map((t,i)=>`<article class="theme">
-        <div class="tt">${esc(t.title)}</div>
-        ${t.summary?`<div>${esc(t.summary)}</div>`:''}
-        <div class="src">${(t.needIds||[]).map(id=>`<span class="chip" title="${esc(nmap[id]?(nmap[id].pain||nmap[id].want):'找不到這則需求')}">${esc(id)}${nmap[id]&&nmap[id].plus.length?` +${nmap[id].plus.length}`:''}</span>`).join('')}</div>
-        ${t.conflict?`<div class="conflict"><b>待決定：</b>${esc(t.conflict)}</div>`:''}
-        ${t.decision?`<div class="decision"><b>決定：</b>${esc(t.decision)}</div>`:''}
-        ${owner?`<div><button class="linkbtn" data-tedit="${i}">編輯</button></div><div class="tedit" id="te_${i}" hidden>
-          <label class="f"><span>主題名稱</span><input type="text" data-k="title" value="${esc(t.title)}"></label>
-          <label class="f"><span>說明</span><textarea data-k="summary" rows="2">${esc(t.summary)}</textarea></label>
-          <label class="f"><span>來源需求編號（逗號分隔）</span><input type="text" data-k="needIds" value="${esc((t.needIds||[]).join(', '))}"></label>
-          <label class="f"><span>意見衝突（待決定）</span><textarea data-k="conflict" rows="2">${esc(t.conflict)}</textarea></label>
-          <label class="f"><span>決定（填了會寫進規格的「已決定事項」）</span><textarea data-k="decision" rows="2">${esc(t.decision)}</textarea></label>
-          <div class="row"><button class="btn sm" data-tdel="${i}">刪除主題</button><button class="btn sm primary" data-tsave="${i}">儲存</button></div>
-        </div>`:''}
-      </article>`).join(''):`<p class="empty">還沒有整理結果。${owner?'用右邊的步驟請 AI 先整理一版。':'管理者整理後會出現在這裡。'}</p>`}
-      ${unassigned.length&&themes.length?`<section class="card"><h2>還沒歸到主題的需求 <span class="c">${unassigned.length}</span></h2><div class="in list">${unassigned.map(n=>needCard(n,{compact:true})).join('')}</div></section>`:''}
-    </div>
-    ${owner?`<section class="card"><h2>用 AI 整理</h2><div class="in">
-      <p class="hint">1. 複製提示詞（已包含全部 ${needs.length} 則需求與附議數）<br>2. 貼到 Claude 或 Gemini 的對話<br>3. 把 AI 回覆的內容整段貼回下面</p>
-      <button class="btn" id="copyThemes" ${needs.length?'':'disabled'}>複製提示詞</button>
-      <label class="f"><span>貼上 AI 的回覆</span><textarea id="themesIn" rows="6" placeholder='{"themes":[…]}'></textarea></label>
-      <button class="btn primary" id="importThemes">${themes.length?'取代目前的主題':'匯入主題'}</button>
-      <hr style="border:none;border-top:1px solid var(--line);width:100%">
-      <button class="btn" id="addTheme">手動新增一個主題</button>
-    </div></section>`:`<section class="card"><h2>說明</h2><div class="in"><p class="hint">這裡是管理者把大家的需求歸納後的結果。「待決定」是同事之間意見不同的地方，會在寫規格前討論決定。對整理結果有意見，可以回到「需求」分頁留言。</p></div></section>`}
-  </div>`;
-  if(!owner) return;
-  $('copyThemes').onclick=()=>copyText(themesPrompt());
-  $('importThemes').onclick=async e=>{
-    const obj=parseLoose($('themesIn').value), list=obj&&(Array.isArray(obj)?obj:obj.themes);
-    if(obj&&Array.isArray(obj.nodes)){ toast('這段是規格，請在「進入寫規格」後貼到「規格」分頁'); return; }
-    if(!Array.isArray(list)||!list.length){ toast('看不懂這段內容，請確認貼上的是 AI 回覆的 JSON'); return; }
-    const r=await act(e.target,'pageSaveThemes',S.project,list.map((t,i)=>({...t,id:'t'+(i+1)}))).catch(()=>null); if(r){ S.plan=r; renderProject(); toast(`已匯入 ${r.themes.length} 個主題`); }
-  };
-  $('addTheme').onclick=async e=>{ const list=themes.concat([{id:'t'+Date.now().toString(36),title:'新主題',summary:'',needIds:[],conflict:'',decision:''}]);
-    const r=await act(e.target,'pageSaveThemes',S.project,list).catch(()=>null); if(r){ S.plan=r; renderProject(); const i=r.themes.length-1; const el=$('te_'+i); if(el){ el.hidden=false; el.querySelector('input').focus(); } } };
-  $('tabBody').querySelectorAll('[data-tedit]').forEach(b=>b.onclick=()=>{ const el=$('te_'+b.dataset.tedit); el.hidden=!el.hidden; });
-  $('tabBody').querySelectorAll('[data-tsave]').forEach(b=>b.onclick=async()=>{
-    const i=+b.dataset.tsave, el=$('te_'+i), t={...themes[i]};
-    el.querySelectorAll('[data-k]').forEach(x=>{ t[x.dataset.k]= x.dataset.k==='needIds' ? x.value.split(/[,，\s]+/).filter(Boolean) : x.value; });
-    const list=themes.slice(); list[i]=t; const r=await act(b,'pageSaveThemes',S.project,list).catch(()=>null); if(r){ S.plan=r; renderProject(); toast('已儲存'); } });
-  $('tabBody').querySelectorAll('[data-tdel]').forEach(b=>b.onclick=async()=>{
-    if(b.dataset.armed!=='1'){ b.dataset.armed='1'; b.textContent='再按一次確定刪除'; return; }
-    const list=themes.filter((_,i)=>i!==+b.dataset.tdel); const r=await act(b,'pageSaveThemes',S.project,list).catch(()=>null); if(r){ S.plan=r; renderProject(); toast('已刪除'); } });
-}
-
-/* ---------- ④ 規格 ---------- */
-function specPrompt(){
-  const p=proj(), th=S.plan.themes;
-  const tlines=th.map(t=>`■ ${t.title}：${t.summary}${t.decision?`\n  已決定：${t.decision}`:''}${t.conflict&&!t.decision?`\n  尚未決定：${t.conflict}`:''}\n  來源：${(t.needIds||[]).join(', ')}`).join('\n');
-  const R=curRound(), base=R>1&&S.dev?S.dev.spec:null;
-  const nlines=roundNeeds(R).map(n=>`[${n.id}] ${n.topic||''}（${n.plus.length} 人附議）問題：${n.pain||'—'}／希望：${n.want||'—'}`).join('\n');
-  const head = base
-    ? `你是系統分析師。「${p.title}」已經上線 v${S.dev.version}，以下是第 ${R} 輪新增的需求。請在目前規格的基礎上修改，輸出完整的新版規格。\n\n重要：沒有變動的節點，id 和內容要原封不動保留；修改的節點沿用原本的 id；只有全新的步驟才用新 id。AI Agent 會依據差異只重做有變動的部分。\n\n目前規格（v${S.dev.version}）：\n${JSON.stringify(Object.assign({},base,{version:undefined}))}`
-    : `你是系統分析師。請根據以下整理好的需求，寫出「${p.title}」的工作流程規格。之後會由 AI Agent 依這份規格開發，並由不寫程式的同事驗收。`;
-  return `${head}
-
-專案目的：${p.purpose||'（未填）'}
-
-需求主題：
-${tlines||'（尚未整理）'}
-
-原始需求：
-${nlines}
-
-撰寫規則：
-1. 流程拆成 4 到 10 個節點，節點類型只能用：input（輸入）、llm（AI 判斷或生成）、retrieve（查資料）、condition（分流）、tool（程式處理）、output（輸出）
-2. 每個節點的 label 和 description 用同事看得懂的白話
-3. 每個節點寫 inputs、outputs（英文小寫欄位名稱），下游需要的欄位，上游一定要有節點輸出
-4. 除了 input 節點，每個節點至少一條驗收標準（acceptance），要具體、可以實際測試，例如「問『學費怎麼繳』要分到行政類」
-5. condition 節點的分支名稱寫在 edges 的 label
-6. 已決定的事項放進 decisions；尚未決定的事項，在 openQuestions 列出，不要自己做決定
-7. 不要加入需求裡沒有的功能
-
-只回覆一個 JSON，不要其他文字，格式：
-{"title":"…","purpose":"…","nodes":[{"id":"英文小寫_底線","type":"llm","label":"…","description":"…","inputs":["…"],"outputs":["…"],"acceptance":[{"id":"a1","text":"…"}]}],"edges":[{"from":"…","to":"…","label":"可省略"}],"decisions":["…"],"openQuestions":["…"]}`;
-}
 function specDiff(a,b){
   const key=n=>JSON.stringify(Object.assign({},n,{x:undefined,y:undefined}));
   const am=Object.fromEntries((a.nodes||[]).map(n=>[n.id,n])), bm=Object.fromEntries((b.nodes||[]).map(n=>[n.id,n])), out=[];
@@ -520,88 +755,10 @@ function lint(spec){
   (spec.openQuestions||[]).forEach(q=>w.push('尚未決定：'+q));
   return w;
 }
-function renderSpec(){
-  const owner=S.isOwner, p=proj();
-  const published=p.status==='developing';
-  const text=published&&S.dev?JSON.stringify(S.dev.spec,null,2):(S.plan.draft||''), spec=parseLoose(text);
-  const base=!published&&S.dev?S.dev.spec:null, dl=base&&spec&&spec.nodes?specDiff(base,spec):null;
-  $('tabBody').innerHTML=`<div class="two">
-    <div class="list">
-      <section class="card"><h2>流程預覽<span class="sp"></span>${spec?`<span class="who2">${(spec.nodes||[]).length} 個節點</span>`:''}</h2>
-        ${spec&&spec.nodes?`<div class="graph" id="specGraph"></div>`:`<div class="in"><p class="empty">${text?'草稿不是有效的 JSON。':'還沒有規格草稿。'}${owner&&!published?'用右邊的步驟產生一版。':''}</p></div>`}
-      </section>
-      ${dl?`<section class="card"><h2>和已上線 v${S.dev.version} 的差異</h2><div class="in">${dl.length?`<ul class="diff">${dl.map(d=>`<li class="${d.k}">${d.k==='add'?'＋ 新增':d.k==='chg'?'～ 修改':'－ 刪除'}　${esc(d.label)} <span class="who2">${esc(d.id)}</span></li>`).join('')}</ul><p class="hint">發布後 AI Agent 只需要處理這些節點。</p>`:`<p class="hint">目前草稿和 v${S.dev.version} 完全一樣。</p>`}</div></section>`:''}
-      ${spec&&spec.nodes?`<section class="card"><h2>檢查結果</h2><div class="in">${(()=>{ const w=lint(spec); return w.length?`<ul class="warn">${w.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:`<p class="ok">✓ 節點、連線、輸入輸出、驗收標準都沒有問題</p>`; })()}</div></section>
-      <section class="card"><h2>節點與驗收標準</h2><div class="in nlist">${spec.nodes.map(n=>`<div class="nitem"><div class="h">${esc(n.label||n.id)}<span class="id">${esc(n.id)} · ${TYPE_ZH[n.type]||esc(n.type)}</span></div>${n.description?`<div>${esc(n.description)}</div>`:''}${n.acceptance&&n.acceptance.length?`<ul>${n.acceptance.map(a=>`<li>${esc(a.text)}</li>`).join('')}</ul>`:''}</div>`).join('')}
-        ${spec.decisions&&spec.decisions.length?`<div class="decision"><b>已決定：</b>${spec.decisions.map(esc).join('；')}</div>`:''}</div></section>`:''}
-    </div>
-    <section class="card"><h2>${owner&&!published?'產生與修改規格':'說明'}</h2><div class="in">
-      ${owner&&!published?`
-        ${base?`<p class="hint">草稿已經帶入目前上線的 v${S.dev.version}，提示詞會請 AI 在這個基礎上修改。</p>`:''}
-        <p class="hint">1. 複製提示詞（已包含主題、決定事項和原始需求）<br>2. 貼到 Claude 或 Gemini 的對話<br>3. 把回覆貼進下方，按「儲存草稿」</p>
-        <button class="btn" id="copySpec">複製提示詞</button>
-        <label class="f"><span>規格草稿（JSON，可以直接修改）</span><textarea class="code" id="draftIn" spellcheck="false">${esc(text)}</textarea></label>
-        <button class="btn" id="saveDraft">儲存草稿</button>
-        <div id="pubBox">${spec&&spec.nodes?`<button class="btn primary" id="pubBtn">定稿並發布 v${(p.version||0)+1}</button>`:''}</div>
-      `:published?`<p class="hint">這是目前上線的 v${p.version} 規格，AI Agent 依這份規格開發中，進度請看「開發」分頁。有新需求時，管理者可以按上方「開始第 ${(p.round||1)+1} 輪需求」。</p>`
-      :`<p class="hint">管理者會依整理好的主題產生規格。這裡可以看到流程和每個步驟的驗收標準，有意見請到「需求」分頁留言。</p>`}
-    </div></section>
-  </div>`;
-  if(spec&&spec.nodes) $('specGraph').innerHTML=graphSvg(spec,()=>null,null)+legendHtml(false);
-  if(!(owner&&!published)) return;
-  $('copySpec').onclick=()=>copyText(specPrompt());
-  $('saveDraft').onclick=async e=>{
-    const obj=parseLoose($('draftIn').value);
-    if(obj&&Array.isArray(obj.themes)){ toast('這段是「整理」的主題結果，請貼到「整理」分頁'); return; }
-    if(!obj||!Array.isArray(obj.nodes)){ toast('看不懂這段內容，請確認貼上的是 AI 回覆的規格 JSON（包含 nodes）'); return; }
-    const r=await act(e.target,'pageSaveDraft',S.project,JSON.stringify(obj)).catch(()=>null); if(r){ S.plan=r; renderProject(); toast('草稿已儲存'); }
-  };
-  const pb=$('pubBtn'); if(pb) pb.onclick=()=>{
-    const w=lint(spec);
-    $('pubBox').innerHTML=`<div class="confirm"><b>確定要定稿嗎？</b><span class="hint">定稿後 AI Agent 會依這份規格${base?'更新，只重做有變動的節點':'開始開發'}，專案進入「開發中」。</span>
-      ${w.length?`<span class="hint" style="color:var(--s-review)">檢查結果還有 ${w.length} 個提醒，建議先處理。</span>`:''}
-      <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" id="pubNo">取消</button><button class="btn primary" id="pubYes">確定發布</button></div></div>`;
-    $('pubNo').onclick=()=>renderProject();
-    $('pubYes').onclick=async e=>{ const r=await act(e.target,'pagePublish',S.project).catch(()=>null); if(!r) return;
-      toast(`已發布 v${r.version}`); await loadHome(); openProject(S.project,'dev'); };
-  };
-}
-
-/* ---------- 流程圖（共用） ---------- */
-function layout(spec){
-  const ids=spec.nodes.map(n=>n.id), layer={}; ids.forEach(i=>layer[i]=0);
-  for(let k=0;k<ids.length;k++) (spec.edges||[]).forEach(e=>{ if(layer[e.from]!=null&&layer[e.to]!=null&&layer[e.to]<layer[e.from]+1) layer[e.to]=layer[e.from]+1; });
-  const cols={}; spec.nodes.forEach(n=>{ (cols[layer[n.id]]=cols[layer[n.id]]||[]).push(n.id); });
-  const W=150,H=58,GX=56,GY=34,PX=16,PY=26,pos={};
-  const maxRows=Math.max(...Object.values(cols).map(c=>c.length));
-  Object.entries(cols).forEach(([l,c])=>{ const off=(maxRows-c.length)*(H+GY)/2; c.forEach((id,i)=>pos[id]={x:PX+l*(W+GX),y:PY+off+i*(H+GY),w:W,h:H}); });
-  return {pos,cw:PX*2+Object.keys(cols).length*(W+GX)-GX,ch:PY+16+maxRows*(H+GY)-GY};
-}
-function graphSvg(spec, statusOf, selId){
-  const {pos,cw,ch}=layout(spec);
-  let s=`<svg viewBox="0 0 ${cw} ${ch}" style="width:100%;min-width:${Math.round(cw*0.72)}px;max-width:${cw}px;height:auto" role="img" aria-label="流程圖"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" style="fill:var(--muted)"/></marker></defs>`;
-  (spec.edges||[]).forEach(e=>{ const a=pos[e.from], b=pos[e.to]; if(!a||!b) return;
-    const x1=a.x+a.w, y1=a.y+a.h/2, x2=b.x-2, y2=b.y+b.h/2, dx=Math.max(30,(x2-x1)/2);
-    s+=`<path class="edge" d="M${x1},${y1} C${x1+dx},${y1} ${x2-dx},${y2} ${x2},${y2}" marker-end="url(#ar)"/>`;
-    if(e.label) s+=`<text class="etxt" x="${b.x+2}" y="${b.y-7}">${esc(e.label)} ▸</text>`; });
-  spec.nodes.forEach(n=>{ const p=pos[n.id], info=statusOf(n.id);
-    const c=info?info.c:'--accent', label=info?info.zh:(TYPE_ZH[n.type]||n.type);
-    s+=`<g class="node${selId===n.id?' sel':''}" data-id="${esc(n.id)}" tabindex="0" role="button" aria-label="${esc(n.label)}，${label}">
-      <rect class="box" x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="7"/>
-      <rect x="${p.x}" y="${p.y}" width="6" height="${p.h}" rx="3" style="fill:var(${info?c:'--line'})"/>
-      <text class="lb" x="${p.x+16}" y="${p.y+24}">${esc(n.label||n.id)}</text>
-      ${info?`<circle cx="${p.x+20}" cy="${p.y+41}" r="4" style="fill:var(${c})"/><text class="st" x="${p.x+30}" y="${p.y+45}" style="fill:var(${c})">${label}</text>`
-        :`<text class="st" x="${p.x+16}" y="${p.y+45}" style="fill:var(--muted)">${esc(label)}</text>`}
-      ${info&&info.q?`<text class="q" x="${p.x+p.w-10}" y="${p.y+45}" text-anchor="end">${info.q} 個提問</text>`:''}
-    </g>`; });
-  return s+'</svg>';
-}
-function legendHtml(withStatus){ return withStatus?`<div class="legend">${Object.values(ST).map(v=>`<span><i class="dot" style="background:var(${v.c})"></i>${v.zh}</span>`).join('')}</div>`:''; }
-
 /* ---------- 開發追蹤 ---------- */
 function nodeEv(id){ const e=S.dev.events.filter(x=>x.node===id); return e.length?e[e.length-1]:null; }
 function openQ(id){ return S.dev.questions.filter(q=>q.status==='open'&&(!id||q.node===id)); }
-function nodeInfo(id){ const ev=nodeEv(id), st=ST[(ev&&ev.status)||'todo']||ST.todo; return {...st,q:openQ(id).length}; }
+function nodeInfo(id){ const ev=nodeEv(id), st=ST[(ev&&ev.status)||'todo']||ST.todo; const q=openQ(id).length; return {...st,q:q?q+' 個提問':''}; }
 function artHtml(list){ if(!list||!list.length) return ''; return `<ul class="arts">${list.map(a=>a.url?`<li><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.name||a.path||a.url)}</a></li>`:`<li><span class="path">${esc(a.path||a.name||'')}</span></li>`).join('')}</ul>`; }
 function renderDev(){
   if(!S.dev){ $('tabBody').innerHTML=`<div class="card"><div class="in"><p class="empty">規格定稿發布後，AI Agent 的開發進度會出現在這裡。</p></div></div>`; return; }
@@ -613,7 +770,7 @@ function renderDev(){
       ${['working','blocked','needs_review'].filter(k=>counts[k]).map(k=>`<span class="pill"><i class="dot" style="background:var(${ST[k].c})"></i>${ST[k].zh} <b>${counts[k]}</b></span>`).join('')}
       ${openQ().length?`<span class="pill"><i class="dot" style="background:var(--s-review)"></i>待回覆提問 <b>${openQ().length}</b></span>`:''}</div>
     <div class="two" style="margin-top:14px">
-      <section class="card"><h2>流程</h2><div class="graph" id="devGraph"></div>${legendHtml(true)}</section>
+      <section class="card"><h2>流程</h2><div class="graph" id="devGraph"></div>${legendHtml()}</section>
       <section class="card"><h2>節點詳情</h2><div class="detail" id="detail"></div></section>
     </div>
     <div class="bottom" style="margin-top:14px">
@@ -662,7 +819,9 @@ function renderTimeline(){
 }
 
 /* ================= 啟動 ================= */
-function typing(){ const a=document.activeElement; return a&&/INPUT|TEXTAREA/.test(a.tagName) || [...document.querySelectorAll('textarea,input[type=text]')].some(x=>x.value.trim()); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!$('modal').hidden) closeModal(); });
+$('modal').addEventListener('click',e=>{ if(e.target.id==='modal') closeModal(); });
+function typing(){ if(!$('modal').hidden||!$('busy').hidden) return true; const a=document.activeElement; return a&&/INPUT|TEXTAREA/.test(a.tagName) || [...document.querySelectorAll('textarea,input[type=text]')].some(x=>x.value.trim()); }
 $('homeBtn').onclick=async()=>{ if(google.script.history) google.script.history.replace(null,{}); await loadHome(); renderHome(); };
 $('refresh').onclick=async e=>{ e.target.disabled=true; try{ await loadHome(); if(S.project) await refreshProject(); else renderHome(); banner(''); }catch(err){ banner((err&&err.message)||'讀取失敗'); } e.target.disabled=false; };
 (async()=>{
