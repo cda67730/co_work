@@ -541,7 +541,7 @@ function renderSpec(){
       <span class="ver">草稿 v${lastDraft?lastDraft.v:1}</span><span class="hint">${lastDraft?esc(fmt(lastDraft.ts)+' · '+who(lastDraft.by)+'：'+lastDraft.note):''}</span>
       <span class="sp"></span>
       ${edit?`<button class="btn" id="regenSpec" ${S.plan.aiReady?'':'disabled'}>AI 重新產生整份</button><button class="btn" id="openVers">版本紀錄</button><button class="btn primary" id="openSpecChat" ${S.plan.aiReady?'':'disabled'}>AI 對話整理意見${nOpen?`<span class="badge">${nOpen}</span>`:''}</button>`:''}
-    </div>`:''}
+    </div><div id="regenBox" hidden style="margin-bottom:14px"></div>`:''}
     <div class="two">
       <div class="list">
         <section class="card"><h2>流程圖<span class="sp"></span><span class="who2">${spec.nodes.length} 個步驟 · 點選步驟查看或提意見</span></h2><div class="graph" id="specGraph"></div></section>
@@ -560,7 +560,15 @@ function renderSpec(){
   if(!edit) return;
   $('openSpecChat').onclick=()=>openChat('spec');
   $('openVers').onclick=openVersions;
-  $('regenSpec').onclick=e=>{ const b=e.target; if(b.dataset.armed!=='1'){ b.dataset.armed='1'; b.textContent='再按一次：整份重畫（舊版留在版本紀錄）'; return; } aiSpecRun(true); };
+  $('regenSpec').onclick=()=>{
+    // 目前草稿是空白或範本時直接重畫，不用確認
+    if(spec.nodes.length<2||spec.nodes.some(n=>/^\s*(…|\.{3})?\s*$/.test(n.label||''))) return aiSpecRun(true);
+    const bar=$('regenBox'); bar.hidden=false;
+    bar.innerHTML=`<div class="confirm"><b>要讓 AI 依照需求和主題整份重畫嗎？</b><span class="hint">目前的草稿會留在「版本紀錄」，隨時可以退回。手動改過的內容不會保留在新版裡。</span>
+      <div class="row"><button class="btn" id="regenNo">取消</button><button class="btn primary" id="regenYes">確定重畫</button></div></div>`;
+    $('regenNo').onclick=()=>{ bar.hidden=true; };
+    $('regenYes').onclick=()=>{ bar.hidden=true; aiSpecRun(true); };
+  };
   $('pubBtn').onclick=()=>{
     $('pubBox').innerHTML=`<div class="confirm"><b>確定定稿嗎？</b><span class="hint">AI Agent 會依這份規格${base?'更新，只重做有變動的步驟':'開始開發'}，專案進入「開發」。</span>
       ${w.length?`<span class="hint warnc">規格檢查還有 ${w.length} 個提醒。</span>`:''}${nOpen?`<span class="hint warnc">還有 ${nOpen} 則同事意見沒有處理。</span>`:''}
