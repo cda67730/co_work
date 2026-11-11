@@ -26,6 +26,7 @@ body{background:var(--bg);color:var(--ink);font:14px/1.6 var(--sans)}
 button,textarea,select,input{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .wrap{max-width:1280px;margin:0 auto;padding:16px;display:grid;gap:14px}
+.wrap>*,#view,#tabBody{min-width:0}
 header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px}
 header .brand{font-weight:700;font-size:15px;letter-spacing:.04em}
 header .sp{flex:1}
@@ -119,6 +120,17 @@ textarea.code{font-family:var(--mono);font-size:12.5px;min-height:360px;line-hei
 
 /* 流程圖（共用） */
 .graph{overflow:auto;padding:12px}
+.graph.big{padding:16px;max-height:78vh}
+.overview p{margin:0;max-width:72ch}
+.overview{gap:8px}
+.cq-list{display:grid;gap:14px}
+.cq{display:grid;gap:6px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.cq:last-of-type{border-bottom:none}
+.cqq{display:flex;gap:8px;align-items:baseline;font-size:15px}
+.cqn{flex:none;width:22px;height:22px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-size:12px;font-family:var(--mono);font-weight:700}
+.cq .ans{font-size:13.5px;background:var(--soft);border-radius:6px;padding:6px 10px}
+.clsum summary{cursor:pointer;padding:10px 14px;font-size:13px;color:var(--muted);font-weight:700}
+.clarify .in{padding:16px}
 .graph svg{display:block}
 .graph .edge{fill:none;stroke:var(--muted);stroke-width:1.5}
 .graph .etxt{fill:var(--muted);font-size:12.5px;font-family:var(--sans)}
@@ -126,8 +138,8 @@ textarea.code{font-family:var(--mono);font-size:12.5px;min-height:360px;line-hei
 .graph .node{cursor:pointer}
 .graph .node:hover rect.box{stroke:var(--accent)}
 .graph .node.sel rect.box{stroke:var(--accent);stroke-width:2.5}
-.graph .node .lb{fill:var(--ink);font-size:15px;font-weight:500;font-family:var(--sans)}
-.graph .node .st{font-size:12.5px;font-family:var(--sans)}
+.graph .node .lb{fill:var(--ink);font-size:16.5px;font-weight:500;font-family:var(--sans)}
+.graph .node .st{font-size:13.5px;font-family:var(--sans)}
 .graph .node .q{fill:var(--s-review);font-size:12px;font-weight:700}
 .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);padding:0 14px 10px}
 .legend span{display:inline-flex;align-items:center;gap:5px}
@@ -302,7 +314,7 @@ a.chipbtn{text-decoration:none;color:var(--ink)}
 <div class="toast" id="toast" hidden></div>
 <script>
 /* ================= 共用 ================= */
-const EXPECT_BACKEND = 7;
+const EXPECT_BACKEND = 8;
 const PH = {collecting:'收集', organizing:'整理', drafting:'畫圖及規格', developing:'開發'};
 const PH_ORDER = ['collecting','organizing','drafting','developing'];
 const ST = {
@@ -458,7 +470,7 @@ function bindStageActions(){
     if(!r.aiReady) return;
     const hasThemes=(r.themes||[]).some(t=>(t.needIds||[]).length||t.summary), d=parseLoose(r.draft||'');
     if(b.dataset.phase==='organizing'&&!hasThemes&&roundNeeds(curRound()).length) aiThemesRun('');
-    if(b.dataset.phase==='drafting'&&!(d&&d.nodes&&d.nodes.length)) aiSpecRun(); });
+    if(b.dataset.phase==='drafting'&&!(d&&d.nodes&&d.nodes.length)&&!(r.clarify&&r.clarify.questions&&r.clarify.questions.length)) aiClarifyRun(); });
   const nr=$('nextRound'); if(nr) nr.onclick=async()=>{
     if(nr.dataset.armed!=='1'){ nr.dataset.armed='1'; nr.textContent='再按一次：回到收集（開發進度會保留）'; return; }
     const r=await act(nr,'pageNextRound',S.project).catch(()=>null); if(!r) return;
@@ -527,11 +539,14 @@ function renderSpec(){
   const base = cur&&S.dev ? S.dev.spec : null, dl = base&&spec&&spec.nodes ? specDiff(base,spec) : null;
   const lastDraft=(S.plan.drafts||[]).slice(-1)[0], nOpen=openComments().length;
   if(!spec||!spec.nodes||!spec.nodes.length){
+    const c=S.plan.clarify;
+    if(edit&&c&&c.questions&&c.questions.length){ $('tabBody').innerHTML=clarifyHtml(c,true); bindClarify(c,false); return; }
     $('tabBody').innerHTML=`<div class="card hero"><div class="in">
-      <p class="empty">${edit?'還沒有流程圖。AI 會依照主題、決定事項和需求，畫出初版流程與每一步的驗收標準。':'管理者產生流程圖後，會出現在這裡，到時可以點每個步驟提意見。'}</p>
-      ${edit?`<div><button class="btn primary" id="aiSpec" ${S.plan.aiReady?'':'disabled'}>AI 畫出初版流程圖</button></div>${S.plan.aiReady?'':keyHelp()}`:''}
+      <p class="empty">${edit?'還沒有流程圖。AI 會先讀需求和主題，列出需要釐清的問題；你回答後，再畫出流程圖、整體說明和每一步的驗收標準。':'管理者產生流程圖後，會出現在這裡，到時可以點每個步驟提意見。'}</p>
+      ${edit?`<div class="row left"><button class="btn primary" id="aiClarify" ${S.plan.aiReady?'':'disabled'}>AI 先列出需要釐清的問題</button><button class="btn" id="aiSpec" ${S.plan.aiReady?'':'disabled'}>跳過，直接畫流程圖</button></div>${S.plan.aiReady?'':keyHelp()}`:''}
     </div></div>`;
     const b=$('aiSpec'); if(b) b.onclick=()=>aiSpecRun();
+    const q=$('aiClarify'); if(q) q.onclick=()=>aiClarifyRun();
     return;
   }
   const info=id=>{ const n=spec.nodes.find(x=>x.id===id), c=cur?openComments(id).length:0; return {sub:(TYPE_ZH[n.type]||n.type)+(n.locked&&cur?' · 已鎖定':''), q:c?`${c} 則意見`:''}; };
@@ -542,9 +557,11 @@ function renderSpec(){
       <span class="sp"></span>
       ${edit?`<button class="btn" id="regenSpec" ${S.plan.aiReady?'':'disabled'}>AI 重新產生整份</button><button class="btn" id="openVers">版本紀錄</button><button class="btn primary" id="openSpecChat" ${S.plan.aiReady?'':'disabled'}>AI 對話整理意見${nOpen?`<span class="badge">${nOpen}</span>`:''}</button>`:''}
     </div><div id="regenBox" hidden style="margin-bottom:14px"></div>`:''}
+    <section class="card" style="margin-bottom:14px"><h2>流程圖<span class="sp"></span><span class="who2">${spec.nodes.length} 個步驟 · 點選步驟查看或提意見</span></h2><div class="graph big" id="specGraph"></div></section>
     <div class="two">
       <div class="list">
-        <section class="card"><h2>流程圖<span class="sp"></span><span class="who2">${spec.nodes.length} 個步驟 · 點選步驟查看或提意見</span></h2><div class="graph" id="specGraph"></div></section>
+        ${spec.overview?`<section class="card"><h2>整體說明</h2><div class="in overview">${String(spec.overview).split(/\n+/).filter(Boolean).map(x=>`<p>${esc(x)}</p>`).join('')}</div></section>`:''}
+        ${cur&&S.plan.clarify&&S.plan.clarify.questions&&S.plan.clarify.questions.length?`<details class="card clsum"><summary>釐清問答（${Object.keys(S.plan.clarify.answers||{}).length} / ${S.plan.clarify.questions.length} 已回答）</summary><div class="in">${clarifyHtml(S.plan.clarify,edit,true)}</div></details>`:''}
         ${dl?`<section class="card"><h2>和已上線 v${S.dev.version} 的差異</h2><div class="in">${dl.length?`<ul class="diff">${dl.map(d=>`<li class="${d.k}">${d.k==='add'?'＋ 新增':d.k==='chg'?'～ 修改':'－ 刪除'}　${esc(d.label)}</li>`).join('')}</ul>`:`<p class="hint">和 v${S.dev.version} 完全一樣。</p>`}</div></section>`:''}
         <section class="card"><h2>規格檢查</h2><div class="in">${w.length?`<ul class="warn">${w.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:`<p class="ok">✓ 步驟、連線、輸入輸出、驗收標準都沒有問題</p>`}
           ${spec.decisions&&spec.decisions.length?`<div class="decision"><b>已決定：</b>${spec.decisions.map(esc).join('；')}</div>`:''}</div></section>
@@ -554,7 +571,8 @@ function renderSpec(){
     </div>`;
   const g=$('specGraph'); const draw=()=>{ g.innerHTML=graphSvg(spec,info,S.sel); };
   draw();
-  g.onclick=e=>{ const n=e.target.closest('.node'); if(!n) return; S.sel=n.dataset.id; draw(); renderNodePanel(spec,cur,edit); };
+  g.onclick=e=>{ const n=e.target.closest('.node'); if(!n) return; S.sel=n.dataset.id; draw(); renderNodePanel(spec,cur,edit); if(innerWidth<900) $('nodePanel').scrollIntoView({behavior:'smooth',block:'start'}); };
+  if(cur&&S.plan.clarify&&S.plan.clarify.questions&&S.plan.clarify.questions.length) bindClarify(S.plan.clarify,true);
   g.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ const n=e.target.closest('.node'); if(n){ e.preventDefault(); n.dispatchEvent(new MouseEvent('click',{bubbles:true})); } } };
   renderNodePanel(spec,cur,edit);
   if(!edit) return;
@@ -600,7 +618,7 @@ function renderNodePanel(spec,cur,edit){
       ${edit?`<div class="row left"><button class="btn sm" id="nEdit">手動修改</button><button class="btn sm" id="nLock">${n.locked?'解除鎖定':'鎖定（AI 不改）'}</button><button class="btn sm" id="nAdd">在後面新增步驟</button><button class="btn sm" id="nDel">刪除</button></div>
       <form class="tedit" id="nForm" hidden>
         <label class="f"><span>名稱</span><input type="text" id="nf_label" value="${esc(n.label)}"></label>
-        <label class="f"><span>類型</span><select id="nf_type">${Object.entries(TYPE_ZH).map(([k,v])=>`<option value="${k}" ${k===n.type?'selected':''}>${v}</option>`).join('')}</select></label>
+        <label class="f"><span>類型（自由填寫）</span><input type="text" id="nf_type" list="typeList" value="${esc(TYPE_ZH[n.type]||n.type||'')}"><datalist id="typeList">${['使用者操作','畫面','功能','AI 判斷','資料儲存','外部服務','通知','排程','遊戲邏輯','輸入','輸出'].map(x=>`<option value="${x}">`).join('')}</datalist></label>
         <label class="f"><span>說明</span><textarea id="nf_desc" rows="2">${esc(n.description||'')}</textarea></label>
         <label class="f"><span>需要的資料（逗號分隔）</span><input type="text" id="nf_in" value="${esc((n.inputs||[]).join(', '))}"></label>
         <label class="f"><span>產出的資料（逗號分隔）</span><input type="text" id="nf_out" value="${esc((n.outputs||[]).join(', '))}"></label>
@@ -619,7 +637,7 @@ function renderNodePanel(spec,cur,edit){
   $('nEdit').onclick=()=>{ $('nForm').hidden=false; $('nf_label').focus(); };
   $('nfCancel').onclick=()=>{ $('nForm').hidden=true; };
   $('nForm').onsubmit=async e=>{ e.preventDefault();
-    const patch={label:$('nf_label').value.trim()||n.label,type:$('nf_type').value,description:$('nf_desc').value.trim(),inputs:split($('nf_in').value),outputs:split($('nf_out').value),
+    const patch={label:$('nf_label').value.trim()||n.label,type:$('nf_type').value.trim()||n.type,description:$('nf_desc').value.trim(),inputs:split($('nf_in').value),outputs:split($('nf_out').value),
       acceptance:$('nf_acc').value.split('\n').map(x=>x.trim()).filter(Boolean).map((t,i)=>({id:'a'+(i+1),text:t}))};
     const r=await act($('nfSave'),'pageEditNode',S.project,n.id,patch).catch(()=>null); if(r){ S.plan=r; renderProject(); toast('已儲存，這一步已鎖定'); } };
   $('nLock').onclick=async e=>{ const r=await act(e.target,'pageEditNode',S.project,n.id,{locked:!n.locked}).catch(()=>null); if(r){ S.plan=r; renderProject(); } };
@@ -679,6 +697,28 @@ function openVersions(){
 function keyHelp(){ return `<div class="keyhelp"><b>AI 功能還不能用：還沒設定 Gemini API key</b><ol><li>到 Google AI Studio（aistudio.google.com）建立 API key</li><li>Apps Script 左側「專案設定」→ 最下方「指令碼屬性」→ 新增屬性 <code>GEMINI_API_KEY</code>，值貼上 key → 儲存</li><li>回到這裡按「重新整理」，不用重新部署</li></ol></div>`; }
 function aiError(e){ banner('AI 沒有完成：'+((e&&e.message)||'未知錯誤')+'　（可以再試一次；一直失敗的話，到 Apps Script 執行 testGemini 看原因）'); window.scrollTo(0,0); }
 async function aiThemesRun(msg){ busy(true,'AI 正在整理需求…（約 10–30 秒）'); banner(''); try{ S.plan=await run('pageThemesChat',S.project,msg||''); renderProject(); toast(`整理出 ${S.plan.themes.length} 個主題`); }catch(e){ renderProject(); aiError(e); } busy(false); }
+async function aiClarifyRun(){ busy(true,'AI 正在讀需求，找出需要釐清的地方…（約 10–40 秒）'); banner(''); try{ S.plan=await run('pageSpecClarify',S.project); renderProject();
+    const q=(S.plan.clarify&&S.plan.clarify.questions)||[]; if(!q.length){ toast('AI 判斷資訊足夠，直接畫流程圖'); busy(false); return aiSpecRun(); } toast(`AI 列出 ${q.length} 個問題`); }catch(e){ renderProject(); aiError(e); } busy(false); }
+function clarifyHtml(c,edit,compact){
+  const ans=c.answers||{};
+  return `<section class="${compact?'':'card'} clarify">${compact?'':`<h2>先釐清幾件事<span class="sp"></span><span class="who2">回答後 AI 才會畫流程圖</span></h2>`}<div class="${compact?'':'in'} cq-list">
+    ${c.reply?`<p class="hint">${esc(c.reply)}</p>`:''}
+    ${c.questions.map((q,i)=>`<div class="cq"><div class="cqq"><span class="cqn">${i+1}</span><b>${esc(q.question)}</b></div>${q.why?`<div class="hint">${esc(q.why)}</div>`:''}
+      ${edit?`${q.suggestions&&q.suggestions.length?`<div class="chips">${q.suggestions.map(sg=>`<button type="button" class="chipbtn" data-fill="${esc(q.id)}" data-v="${esc(sg)}">${esc(sg)}</button>`).join('')}</div>`:''}
+        <textarea id="ca_${esc(q.id)}" rows="2" placeholder="可以點上面的選項，或自己寫；不確定可以留空，AI 會先做假設">${esc(ans[q.id]||'')}</textarea>`
+      :`<div class="ans">${ans[q.id]?esc(ans[q.id]):'<span class="hint">（未回答，AI 會先做假設）</span>'}</div>`}</div>`).join('')}
+    ${edit?`<div class="row left"><button class="btn primary" id="caGo">${compact?'更新回答並重新產生整份':'回答完成，畫出流程圖'}</button><button class="btn" id="caSave">只儲存回答</button><button class="btn" id="caRe">請 AI 重新提問</button></div>`:''}
+  </div></section>`;
+}
+function bindClarify(c,regen){
+  const box=$('tabBody');
+  box.querySelectorAll('[data-fill]').forEach(b=>b.onclick=()=>{ const t=$('ca_'+b.dataset.fill); t.value=t.value.trim()?t.value.trim()+'；'+b.dataset.v:b.dataset.v; });
+  const collect=()=>Object.fromEntries(c.questions.map(q=>[q.id,($('ca_'+q.id)||{}).value||'']));
+  const go=$('caGo'); if(!go) return;
+  go.onclick=async()=>{ const r=await act(go,'pageSaveClarify',S.project,collect()).catch(()=>null); if(!r) return; S.plan=r; aiSpecRun(regen); };
+  $('caSave').onclick=async e=>{ const r=await act(e.target,'pageSaveClarify',S.project,collect()).catch(()=>null); if(r){ S.plan=r; renderProject(); toast('已儲存回答'); } };
+  $('caRe').onclick=()=>aiClarifyRun();
+}
 async function aiSpecRun(regen){ busy(true,'AI 正在畫流程圖、寫驗收標準…（約 20–60 秒）'); banner(''); try{ S.plan=await run('pageSpecChat',S.project,'',false,!!regen); renderProject(); toast(regen?'已重新產生流程圖':'初版流程圖完成'); }catch(e){ renderProject(); aiError(e); } busy(false); }
 function busy(on,msg){ const o=$('busy'); o.hidden=!on; if(on) $('busyMsg').textContent=msg||'處理中…'; }
 
@@ -686,7 +726,7 @@ function busy(on,msg){ const o=$('busy'); o.hidden=!on; if(on) $('busyMsg').text
 const KIND = {
   project:['專案','--accent'], phase:['專案','--accent'], round:['專案','--accent'],
   need:['收集','--s-working'], themes:['整理','--s-review'],
-  draft:['規格','--s-done'], comment:['規格','--s-done'], publish:['規格','--s-done'],
+  draft:['規格','--s-done'], comment:['規格','--s-done'], publish:['規格','--s-done'], clarify:['規格','--s-done'],
   dev:['開發','--s-blocked'], answer:['開發','--s-blocked']
 };
 function renderProcess(){
@@ -743,28 +783,43 @@ function renderLog(sw){
 function layout(spec){
   const ids=spec.nodes.map(n=>n.id), layer={}; ids.forEach(i=>layer[i]=0);
   for(let k=0;k<ids.length;k++) (spec.edges||[]).forEach(e=>{ if(layer[e.from]!=null&&layer[e.to]!=null&&layer[e.to]<layer[e.from]+1) layer[e.to]=layer[e.from]+1; });
+  // 沒有上游的節點（例如操作、資料來源）放在它連到的步驟正前方，避免連線穿過其他節點
+  ids.forEach(id=>{ const E=spec.edges||[]; if(E.some(e=>e.to===id)) return;
+    const succ=E.filter(e=>e.from===id&&layer[e.to]!=null).map(e=>layer[e.to]); if(succ.length) layer[id]=Math.max(0,Math.min(...succ)-1); });
   const cols={}; spec.nodes.forEach(n=>{ (cols[layer[n.id]]=cols[layer[n.id]]||[]).push(n.id); });
-  const W=150,H=58,GX=56,GY=34,PX=16,PY=26,pos={};
-  const maxRows=Math.max(...Object.values(cols).map(c=>c.length));
-  Object.entries(cols).forEach(([l,c])=>{ const off=(maxRows-c.length)*(H+GY)/2; c.forEach((id,i)=>pos[id]={x:PX+l*(W+GX),y:PY+off+i*(H+GY),w:W,h:H}); });
-  return {pos,cw:PX*2+Object.keys(cols).length*(W+GX)-GX,ch:PY+16+maxRows*(H+GY)-GY};
+  const L=Object.keys(cols).length, maxRows=Math.max(...Object.values(cols).map(c=>c.length));
+  const W=196,H=70,pos={};
+  const tb = L>4;    // 步驟多時改成由上往下，避免橫向太長被縮小
+  if(!tb){
+    const GX=70,GY=40,PX=20,PY=30;
+    Object.entries(cols).forEach(([l,c])=>{ const off=(maxRows-c.length)*(H+GY)/2; c.forEach((id,i)=>pos[id]={x:PX+l*(W+GX),y:PY+off+i*(H+GY),w:W,h:H}); });
+    return {pos,tb,cw:PX*2+L*(W+GX)-GX,ch:PY+20+maxRows*(H+GY)-GY};
+  }
+  const GX=40,GY=56,PX=20,PY=24, cw=Math.max(PX*2+maxRows*(W+GX)-GX, 520);
+  Object.entries(cols).forEach(([l,c])=>{ const rowW=c.length*(W+GX)-GX, x0=(cw-rowW)/2; c.forEach((id,i)=>pos[id]={x:x0+i*(W+GX),y:PY+l*(H+GY),w:W,h:H}); });
+  return {pos,tb,cw,ch:PY+20+L*(H+GY)-GY};
 }
 /* info(id) → {c:狀態色 token, zh:狀態文字} 或 {sub:灰字說明}；q：右下角提示 */
 function graphSvg(spec, info, selId){
-  const {pos,cw,ch}=layout(spec);
-  let s=`<svg viewBox="0 0 ${cw} ${ch}" style="width:100%;min-width:${Math.round(cw*0.72)}px;max-width:${cw}px;height:auto" role="img" aria-label="流程圖"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" style="fill:var(--muted)"/></marker></defs>`;
+  const {pos,cw,ch,tb}=layout(spec);
+  let s=`<svg viewBox="0 0 ${cw} ${ch}" width="${cw}" height="${ch}" style="max-width:none" role="img" aria-label="流程圖"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" style="fill:var(--muted)"/></marker></defs>`;
   (spec.edges||[]).forEach(e=>{ const a=pos[e.from], b=pos[e.to]; if(!a||!b) return;
-    const x1=a.x+a.w, y1=a.y+a.h/2, x2=b.x-2, y2=b.y+b.h/2, dx=Math.max(30,(x2-x1)/2);
-    s+=`<path class="edge" d="M${x1},${y1} C${x1+dx},${y1} ${x2-dx},${y2} ${x2},${y2}" marker-end="url(#ar)"/>`;
-    if(e.label) s+=`<text class="etxt" x="${b.x+2}" y="${b.y-7}">${esc(e.label)} ▸</text>`; });
+    if(!tb){ const x1=a.x+a.w, y1=a.y+a.h/2, x2=b.x-2, y2=b.y+b.h/2, dx=Math.max(30,(x2-x1)/2);
+      s+=`<path class="edge" d="M${x1},${y1} C${x1+dx},${y1} ${x2-dx},${y2} ${x2},${y2}" marker-end="url(#ar)"/>`;
+      if(e.label) s+=`<text class="etxt" x="${b.x+2}" y="${b.y-8}">${esc(e.label)} ▸</text>`; }
+    else { const x1=a.x+a.w/2, y1=a.y+a.h, x2=b.x+b.w/2, y2=b.y-2, dy=Math.max(20,(y2-y1)/2);
+      s+=`<path class="edge" d="M${x1},${y1} C${x1},${y1+dy} ${x2},${y2-dy} ${x2},${y2}" marker-end="url(#ar)"/>`;
+      if(e.label) s+=`<text class="etxt" x="${x2+8}" y="${y2-10}">${esc(e.label)}</text>`; } });
+  const fit=(t,max)=>{ t=String(t||''); let w=0,o=''; for(const ch of t){ w+=/[\x00-\xff]/.test(ch)?0.55:1; if(w>max){ return o+'…'; } o+=ch; } return o; };
   spec.nodes.forEach(n=>{ const p=pos[n.id], i=info(n.id)||{};
     s+=`<g class="node${selId===n.id?' sel':''}" data-id="${esc(n.id)}" tabindex="0" role="button" aria-label="${esc(n.label)}">
       <rect class="box" x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="7"/>
       <rect x="${p.x}" y="${p.y}" width="6" height="${p.h}" rx="3" style="fill:var(${i.c||'--line'})"/>
-      <text class="lb" x="${p.x+16}" y="${p.y+24}">${esc(n.label||n.id)}</text>
-      ${i.c?`<circle cx="${p.x+20}" cy="${p.y+41}" r="4" style="fill:var(${i.c})"/><text class="st" x="${p.x+30}" y="${p.y+45}" style="fill:var(${i.c})">${esc(i.zh)}</text>`
-        :`<text class="st" x="${p.x+16}" y="${p.y+45}" style="fill:var(--muted)">${esc(i.sub||TYPE_ZH[n.type]||n.type)}</text>`}
-      ${i.q?`<text class="q" x="${p.x+p.w-10}" y="${p.y+45}" text-anchor="end">${esc(i.q)}</text>`:''}
+      <title>${esc(n.label||n.id)}</title>
+      <text class="lb" x="${p.x+18}" y="${p.y+28}">${esc(fit(n.label||n.id,10.5))}</text>
+      ${i.c?`<circle cx="${p.x+22}" cy="${p.y+50}" r="4.5" style="fill:var(${i.c})"/><text class="st" x="${p.x+33}" y="${p.y+55}" style="fill:var(${i.c})">${esc(i.zh)}</text>`
+        :`<text class="st" x="${p.x+18}" y="${p.y+55}" style="fill:var(--muted)">${esc(fit(i.sub||TYPE_ZH[n.type]||n.type,i.q?7:11))}</text>`}
+      ${i.q?`<text class="q" x="${p.x+p.w-10}" y="${p.y+55}" text-anchor="end">${esc(i.q)}</text>`:''}
     </g>`; });
   return s+'</svg>';
 }
@@ -834,10 +889,10 @@ function specDiff(a,b){
 }
 function lint(spec){
   const w=[], ids=new Set((spec.nodes||[]).map(n=>n.id)), edges=spec.edges||[];
-  (spec.nodes||[]).forEach(n=>{ if(!n.id) w.push('有節點沒有 id'); if(!TYPE_ZH[n.type]) w.push(`${n.id} 的類型「${n.type}」不在六種類型裡`); });
+  (spec.nodes||[]).forEach(n=>{ if(!n.id) w.push('有節點沒有 id'); });
   edges.forEach(e=>{ if(!ids.has(e.from)||!ids.has(e.to)) w.push(`連線 ${e.from} → ${e.to} 指到不存在的節點`); });
   (spec.nodes||[]).forEach(n=>{
-    if(n.type!=='input'&&!(n.acceptance&&n.acceptance.length)) w.push(`${n.label||n.id} 沒有驗收標準`);
+    if(n.type!=='input'&&n.type!=='輸入'&&!(n.acceptance&&n.acceptance.length)) w.push(`${n.label||n.id} 沒有驗收標準`);
     if(!(n.inputs&&n.inputs.length)) return;
     const anc=new Set(), st=[n.id]; while(st.length){ const c=st.pop(); edges.forEach(e=>{ if(e.to===c&&!anc.has(e.from)){ anc.add(e.from); st.push(e.from); } }); }
     const avail=new Set((spec.nodes||[]).filter(x=>anc.has(x.id)).flatMap(x=>x.outputs||[]));

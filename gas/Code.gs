@@ -20,14 +20,14 @@ const SHEETS = {
   specs:     ['project', 'version', 'title', 'status', 'specJson', 'specMd', 'createdAt', 'createdBy'],
   events:    ['ts', 'project', 'version', 'node', 'status', 'summary', 'artifacts', 'commit', 'actor'],
   questions: ['id', 'ts', 'project', 'version', 'node', 'question', 'status', 'answer', 'answeredBy', 'answeredAt', 'actor'],
-  projects:  ['project', 'title', 'purpose', 'due', 'status', 'themesJson', 'draftJson', 'createdAt', 'createdBy', 'updatedAt', 'round'],
+  projects:  ['project', 'title', 'purpose', 'due', 'status', 'themesJson', 'draftJson', 'createdAt', 'createdBy', 'updatedAt', 'round', 'clarifyJson'],
   needs:     ['id', 'ts', 'project', 'author', 'topic', 'pain', 'want', 'plus', 'commentsJson', 'round'],
   drafts:    ['project', 'round', 'v', 'ts', 'by', 'note', 'specJson'],
   chats:     ['ts', 'project', 'round', 'stage', 'role', 'author', 'text', 'log'],
   comments:  ['id', 'ts', 'project', 'round', 'node', 'author', 'text', 'status', 'note'],
   activity:  ['ts', 'project', 'actor', 'kind', 'text'],
 };
-const BACKEND_VERSION = 7;   // 和 Page.html 的 EXPECT_BACKEND 對應，不一致時頁面會提醒
+const BACKEND_VERSION = 8;   // 和 Page.html 的 EXPECT_BACKEND 對應，不一致時頁面會提醒
 const PHASES = ['collecting', 'organizing', 'drafting', 'developing'];
 const STATUSES = ['todo', 'working', 'done', 'blocked', 'needs_review'];
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -148,7 +148,7 @@ function pageNextRound(project) {
     const base = Object.assign({}, cur.spec); delete base.version;
     const round = (Number(p.round) || 1) + 1;
     updateRow_('projects', 'project', project, {
-      status: 'collecting', round: round, themesJson: '[]', draftJson: JSON.stringify(base, null, 2), updatedAt: now_(),
+      status: 'collecting', round: round, themesJson: '[]', draftJson: JSON.stringify(base, null, 2), clarifyJson: '', updatedAt: now_(),
     });
     appendObj_('drafts', { project: project, round: round, v: 1, ts: now_(), by: user, note: '以上線的 v' + cur.version + ' 為底稿', specJson: JSON.stringify(base) });
     log_(project, user, 'round', '開始第 ' + round + ' 輪需求（目前上線 v' + cur.version + '）');
@@ -188,6 +188,7 @@ function pagePlanning(project) {
     chats: rows_('chats').filter(inRound).map(r => ({ ts: r.ts, stage: r.stage, role: r.role, author: r.author, text: r.text, log: parse_(r.log, []) })),
     comments: rows_('comments').filter(inRound).map(r => ({ id: r.id, ts: r.ts, node: r.node, author: r.author, text: r.text, status: r.status, note: r.note })),
     aiReady: !!PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY'),
+    clarify: p ? parse_(p.clarifyJson, null) : null,
     backend: BACKEND_VERSION,
   };
 }
@@ -311,18 +312,18 @@ function testGemini() {
 /* Gemini 回覆結構（responseSchema），避免 AI 自由發揮格式或抄回範本 */
 const STR = { type: 'STRING' }, STRS = { type: 'ARRAY', items: { type: 'STRING' } };
 const SC_ACC = { type: 'ARRAY', items: { type: 'OBJECT', properties: { id: STR, text: STR }, required: ['id', 'text'] } };
-const SC_NODE = { type: 'OBJECT', properties: { id: STR, type: { type: 'STRING', enum: NODE_TYPES }, label: STR, description: STR, inputs: STRS, outputs: STRS, acceptance: SC_ACC },
+const SC_NODE = { type: 'OBJECT', properties: { id: STR, type: STR, label: STR, description: STR, inputs: STRS, outputs: STRS, acceptance: SC_ACC },
   required: ['id', 'type', 'label', 'description', 'inputs', 'outputs', 'acceptance'] };
 const SC_EDGE = { type: 'OBJECT', properties: { from: STR, to: STR, label: STR }, required: ['from', 'to'] };
-const SC_SPEC = { type: 'OBJECT', properties: { title: STR, purpose: STR, nodes: { type: 'ARRAY', items: SC_NODE }, edges: { type: 'ARRAY', items: SC_EDGE }, decisions: STRS, openQuestions: STRS },
-  required: ['title', 'purpose', 'nodes', 'edges', 'decisions', 'openQuestions'] };
+const SC_SPEC = { type: 'OBJECT', properties: { title: STR, purpose: STR, overview: STR, nodes: { type: 'ARRAY', items: SC_NODE }, edges: { type: 'ARRAY', items: SC_EDGE }, decisions: STRS, openQuestions: STRS },
+  required: ['title', 'purpose', 'overview', 'nodes', 'edges', 'decisions', 'openQuestions'] };
 const SC_FRESH = { type: 'OBJECT', properties: { reply: STR, spec: SC_SPEC }, required: ['reply', 'spec'] };
 const SC_OPS = { type: 'OBJECT', properties: {
   reply: STR,
   ops: { type: 'ARRAY', items: { type: 'OBJECT', properties: {
-    op: { type: 'STRING', enum: ['add_node', 'update_node', 'remove_node', 'connect', 'disconnect', 'set_decisions', 'set_open_questions', 'set_title', 'set_purpose'] },
+    op: { type: 'STRING', enum: ['add_node', 'update_node', 'remove_node', 'connect', 'disconnect', 'set_decisions', 'set_open_questions', 'set_title', 'set_purpose', 'set_overview'] },
     id: STR, node: SC_NODE,
-    set: { type: 'OBJECT', properties: { type: { type: 'STRING', enum: NODE_TYPES }, label: STR, description: STR, inputs: STRS, outputs: STRS, acceptance: SC_ACC } },
+    set: { type: 'OBJECT', properties: { type: STR, label: STR, description: STR, inputs: STRS, outputs: STRS, acceptance: SC_ACC } },
     from: STR, to: STR, label: STR, list: STRS, text: STR }, required: ['op'] } },
   resolved: STRS,
   unresolved: { type: 'ARRAY', items: { type: 'OBJECT', properties: { id: STR, reason: STR }, required: ['id', 'reason'] } } },
@@ -330,6 +331,8 @@ const SC_OPS = { type: 'OBJECT', properties: {
 const SC_THEMES = { type: 'OBJECT', properties: { reply: STR, themes: { type: 'ARRAY', items: { type: 'OBJECT',
   properties: { id: STR, title: STR, summary: STR, needIds: STRS, conflict: STR, decision: STR }, required: ['id', 'title', 'summary', 'needIds', 'conflict', 'decision'] } } },
   required: ['reply', 'themes'] };
+const SC_CLARIFY = { type: 'OBJECT', properties: { reply: STR, questions: { type: 'ARRAY', items: { type: 'OBJECT',
+  properties: { id: STR, question: STR, why: STR, suggestions: STRS }, required: ['id', 'question', 'why', 'suggestions'] } } }, required: ['reply', 'questions'] };
 const isPlaceholder_ = v => /^\s*(…|\.{3}|-|—|xxx|todo|tbd)?\s*$/i.test(String(v == null ? '' : v));
 
 function chatAppend_(project, round, stage, role, author, text, log) {
@@ -396,10 +399,11 @@ function pageSpecChat(project, message, includeComments, regenerate) {
   const msg = String(message || '').trim() || (fresh ? (regenerate ? '請依需求與主題重新產生整份流程與規格。' : '請依需求與主題產生初版流程與規格。') : open.length ? '請把同事的意見整理進規格。' : '');
   if (!msg) throw new Error('請輸入要修改的內容。');
   const rules = [
-    '你是系統分析師，和團隊一起設計一個工作流程。之後 AI Agent 會照規格開發，不寫程式的同事會依驗收標準驗收。用繁體中文。',
-    '節點 type 只能是：input（輸入）、llm（AI 判斷或生成）、retrieve（查資料）、condition（分流）、tool（程式處理）、output（輸出）。',
-    '每個節點：id（英文小寫加底線）、type、label（白話）、description（白話）、inputs、outputs（英文小寫欄位名，下游要的欄位上游一定要有）、acceptance（除了 input 都要有，具體可測試，例如「問『學費怎麼繳』要分到行政類」，格式 [{"id":"a1","text":"…"}]）。',
-    'condition 的分支名稱寫在連線 label。已決定的事放 decisions；還沒決定的放 openQuestions，不要自己做決定。不要加入需求沒有的功能。',
+    '你是資深的產品規劃師兼系統分析師，和團隊一起把需求變成可以開發的規格。之後 AI Agent 會照規格開發，不寫程式的同事會依驗收標準驗收。用繁體中文、白話。',
+    '專案可能是任何類型：工作流程自動化、網站、應用程式、遊戲、資料報表、內部工具……請依專案的性質自由規劃，用最適合的方式拆解，不要硬套成問答或知識庫流程。',
+    '流程圖的節點代表主要的步驟、畫面或功能模組；連線代表先後順序、使用者動線或依賴關係，分支或條件寫在連線 label。',
+    '每個節點：id（英文小寫加底線）、type（用 2 到 6 個字的中文描述性質，例如：使用者操作、畫面、遊戲邏輯、AI 判斷、資料儲存、外部服務、通知、排程）、label（白話名稱）、description（這一步做什麼、怎麼運作）、inputs、outputs（需要和產出的資料，英文小寫名稱，沒有就給空陣列）、acceptance（具體可以實際操作測試的驗收標準，每個節點至少一條，例如「按方向鍵左，車子在 0.2 秒內轉向」）。',
+    '已決定的事放 decisions；還沒決定或你做了假設的事放 openQuestions。不要加入需求沒有的功能。',
     '所有內容都要根據下面的需求實際撰寫，不可以出現「…」、範例文字或空白的名稱。',
   ];
   let system, prompt;
@@ -407,9 +411,10 @@ function pageSpecChat(project, message, includeComments, regenerate) {
     '\n\n主題：\n' + (plan.themes.map(t => '■ ' + t.title + '：' + t.summary + (t.decision ? '\n  已決定：' + t.decision : t.conflict ? '\n  尚未決定：' + t.conflict : '')).join('\n') || '（無）') +
     '\n\n這一輪的需求：\n' + needsText_(plan.needs.filter(n => n.round === round));
   if (fresh) {
-    system = rules.concat(['流程拆成 4 到 10 個節點，從 input 節點開始，到 output 節點結束，每個節點都要有連線。',
-      '回覆欄位：reply 用一兩句話說明這份流程；spec 是完整規格（title、purpose、nodes、edges、decisions、openQuestions）。edges 的 from、to 要用節點 id。']).join('\n');
-    prompt = ctx + '\n\n指示：' + msg;
+    system = rules.concat(['拆成 4 到 12 個節點，每個節點都要和其他節點連線。',
+      'overview 用 3 到 6 段白話文字說明：這是什麼、給誰用、怎麼運作、包含哪些部分、這一版不做什麼。段落之間用換行分隔。',
+      '回覆欄位：reply 用一兩句話說明這份規格；spec 是完整規格（title、purpose、overview、nodes、edges、decisions、openQuestions）。edges 的 from、to 要用節點 id。']).join('\n');
+    prompt = ctx + clarifyText_(plan) + '\n\n指示：' + msg;
   } else {
     const locked = draft.nodes.filter(n => n.locked).map(n => n.id);
     system = rules.concat([
@@ -417,11 +422,11 @@ function pageSpecChat(project, message, includeComments, regenerate) {
       '修改動作（ops 陣列，每個動作用 op 指定種類）：',
       'add_node：新增步驟，完整節點放在 node；update_node：修改步驟，id 指定節點、要改的欄位放在 set；remove_node：刪除步驟，id 指定節點；',
       'connect：新增連線，用 from、to（節點 id），分支名稱放 label；disconnect：移除連線，用 from、to；',
-      'set_decisions、set_open_questions：用 list 給完整的新清單；set_title、set_purpose：用 text 給新內容。',
+      'set_decisions、set_open_questions：用 list 給完整的新清單；set_title、set_purpose、set_overview：用 text 給新內容。',
       '有同事意見時，逐則判斷：採納的意見編號放 resolved；不採納或需要人決定的放 unresolved，並寫 reason。沒有就給空陣列。',
       'reply 用一兩句話說明改了什麼。',
     ]).join('\n');
-    prompt = ctx + '\n\n目前規格：\n' + JSON.stringify(draft) +
+    prompt = ctx + clarifyText_(plan) + '\n\n目前規格：\n' + JSON.stringify(draft) +
       (locked.length ? '\n\n鎖定節點（不能改）：' + locked.join(', ') : '') +
       (open.length ? '\n\n同事意見：\n' + open.map(c => '[' + c.id + '] 節點 ' + (c.node || '整體') + '｜' + c.author.replace(/@.*/, '') + '：' + c.text).join('\n') : '') +
       '\n\n最近對話：\n' + (recentChat_(project, round, 'spec', 6) || '（無）') +
@@ -449,6 +454,49 @@ function pageSpecChat(project, message, includeComments, regenerate) {
   return pagePlanning(project);
 }
 
+function clarifyText_(plan) {
+  const c = plan.clarify;
+  if (!c || !c.questions || !c.questions.length) return '';
+  return '\n\n釐清問答（管理者回答；沒回答的請做合理假設，並寫進 openQuestions）：\n' +
+    c.questions.map(q => 'Q：' + q.question + '\nA：' + ((c.answers || {})[q.id] || '（未回答）')).join('\n');
+}
+
+/** 產生規格前，AI 先列出需要釐清的問題 */
+function pageSpecClarify(project) {
+  const user = ownerOnly_();
+  const plan = pagePlanning(project), p = plan.info, round = plan.round;
+  const system = [
+    '你是資深的產品規劃師。團隊接下來要依需求寫出流程與規格，交給 AI Agent 開發。專案可能是任何類型（工作流程、網站、應用程式、遊戲、報表、內部工具）。',
+    '先判斷：要寫出完整、可以開發和驗收的規格，還缺哪些關鍵資訊？例如使用者是誰、在哪裡用、範圍多大、要用到哪些既有系統或資料、成功的標準、有哪些限制。',
+    '列出 0 到 6 個最關鍵的問題。規則：用白話、一次只問一件事、不問需求裡已經講清楚的事；why 用一句話說明為什麼要問；suggestions 給 2 到 4 個常見的答案選項，讓不懂技術的人也能直接選。',
+    '資訊已經足夠就回傳空的 questions。reply 用一兩句話說明你的判斷。所有內容都要根據下面的需求實際撰寫，不可以出現「…」或範例文字。',
+  ].join('\n');
+  const prompt = '專案：' + p.title + (p.purpose ? '（目的：' + p.purpose + '）' : '') +
+    '\n\n主題：\n' + (plan.themes.map(t => '■ ' + t.title + '：' + t.summary + (t.decision ? '\n  已決定：' + t.decision : t.conflict ? '\n  尚未決定：' + t.conflict : '')).join('\n') || '（無）') +
+    '\n\n這一輪的需求：\n' + needsText_(plan.needs.filter(n => n.round === round)) +
+    (round > 1 && plan.draft ? '\n\n目前上線的規格（這一輪要在這個基礎上修改）：\n' + plan.draft : '');
+  const out = gemini_('spec', system, prompt, SC_CLARIFY);
+  const qs = (out.questions || []).filter(q => !isPlaceholder_(q.question)).slice(0, 8).map((q, i) => ({
+    id: 'q' + (i + 1), question: String(q.question).trim(), why: String(q.why || '').trim(),
+    suggestions: (q.suggestions || []).filter(x => !isPlaceholder_(x)).slice(0, 4) }));
+  const c = { ts: now_(), reply: String(out.reply || ''), questions: qs, answers: {} };
+  withLock_(() => updateRow_('projects', 'project', project, { clarifyJson: JSON.stringify(c), updatedAt: now_() }));
+  log_(project, user, 'clarify', qs.length ? 'AI 列出 ' + qs.length + ' 個需要釐清的問題' : 'AI 判斷資訊足夠，不需要釐清');
+  return pagePlanning(project);
+}
+
+function pageSaveClarify(project, answers) {
+  const user = ownerOnly_();
+  const plan = pagePlanning(project);
+  const c = plan.clarify || { questions: [], answers: {} };
+  c.answers = {};
+  Object.keys(answers || {}).forEach(k => { const v = String(answers[k] || '').trim(); if (v) c.answers[k] = v; });
+  c.answeredAt = now_();
+  withLock_(() => updateRow_('projects', 'project', project, { clarifyJson: JSON.stringify(c), updatedAt: now_() }));
+  log_(project, user, 'clarify', '回答了 ' + Object.keys(c.answers).length + ' / ' + c.questions.length + ' 個釐清問題');
+  return pagePlanning(project);
+}
+
 function normalizeSpec_(spec) {
   spec.nodes = (spec.nodes || []).filter(n => n && n.id).map(normNode_);
   spec.edges = (spec.edges || []).filter(e => e && e.from && e.to);
@@ -461,7 +509,7 @@ function normalizeSpec_(spec) {
 function normNode_(n) {
   const o = Object.assign({}, n);
   o.id = String(o.id).trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
-  if (NODE_TYPES.indexOf(o.type) < 0) o.type = 'tool';
+  o.type = isPlaceholder_(o.type) ? '步驟' : String(o.type).trim().slice(0, 12);
   ['inputs', 'outputs'].forEach(k => { o[k] = Array.isArray(o[k]) ? o[k].map(String) : []; });
   o.acceptance = (Array.isArray(o.acceptance) ? o.acceptance : []).map((a, i) =>
     typeof a === 'string' ? { id: 'a' + (i + 1), text: a } : { id: String(a.id || 'a' + (i + 1)), text: String(a.text || '') }).filter(a => a.text);
@@ -496,8 +544,9 @@ function applySpecOps_(draft, ops) {
     } else if (o.op === 'set_decisions' || o.op === 'set_open_questions') {
       const f = o.op === 'set_decisions' ? 'decisions' : 'openQuestions';
       spec[f] = (o.list || []).filter(x => !isPlaceholder_(x)); log.push('更新' + (f === 'decisions' ? '已決定事項' : '待決定事項'));
-    } else if ((o.op === 'set_title' || o.op === 'set_purpose') && !isPlaceholder_(o.text)) {
-      spec[o.op === 'set_title' ? 'title' : 'purpose'] = o.text; log.push('更新' + (o.op === 'set_title' ? '標題' : '目的'));
+    } else if ((o.op === 'set_title' || o.op === 'set_purpose' || o.op === 'set_overview') && !isPlaceholder_(o.text)) {
+      const f = { set_title: 'title', set_purpose: 'purpose', set_overview: 'overview' }[o.op];
+      spec[f] = o.text; log.push('更新' + { title: '標題', purpose: '目的', overview: '整體說明' }[f]);
     } else if (o.op === 'set' && ['decisions', 'openQuestions', 'title', 'purpose'].indexOf(o.field) >= 0) {
       spec[o.field] = o.value; log.push('更新 ' + ({ decisions: '已決定事項', openQuestions: '待決定事項', title: '標題', purpose: '目的' })[o.field]);
     }

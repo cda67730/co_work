@@ -92,6 +92,7 @@ function renderSpecMd(spec) {
   L.push(`# ${spec.title || spec.project || '流程規格'}`, '');
   L.push(`版本 v${spec.version ?? '?'}${spec.target ? ` · 目標：${spec.target}` : ''}`, '');
   if (spec.purpose) L.push('## 目的', '', spec.purpose, '');
+  if (spec.overview) L.push('## 整體說明', '', String(spec.overview).split(/\n+/).join('\n\n'), '');
   L.push('## 流程', '', '```mermaid', 'flowchart LR');
   for (const n of spec.nodes) {
     const lb = (n.label || n.id).replace(/"/g, "'");
@@ -114,6 +115,11 @@ function renderSpecMd(spec) {
       L.push('', '**驗收標準**', '');
       for (const a of n.acceptance) L.push(`- [ ] \`${a.id}\` ${a.text}`);
     }
+    L.push('');
+  }
+  if (spec.openQuestions?.length) {
+    L.push('## 待決定', '');
+    for (const q of spec.openQuestions) L.push(`- ${q}`);
     L.push('');
   }
   if (spec.decisions?.length) {
