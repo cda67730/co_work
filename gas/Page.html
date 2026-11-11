@@ -247,6 +247,30 @@ textarea.code{font-family:var(--mono);font-size:12.5px;min-height:360px;line-hei
 .vinfo{flex:1;min-width:0;font-size:13px}
 .busy{position:fixed;inset:0;background:color-mix(in srgb,var(--bg) 70%,transparent);display:flex;align-items:center;justify-content:center;z-index:30}
 .busy .card{padding:18px 22px;display:flex;gap:10px;align-items:center}
+/* 成果 */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:12px;background:var(--panel)}
+.segb{border:none;background:none;padding:6px 18px;cursor:pointer;color:var(--muted)}
+.segb.on{background:var(--accent);color:var(--accent-ink);font-weight:700}
+#outBody{display:grid;gap:14px}
+.prog{display:grid;gap:8px}
+.bar{height:10px;border-radius:999px;background:var(--soft);border:1px solid var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--s-done)}
+.demos{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+.demo{display:grid;gap:2px;border:1.5px solid var(--accent);border-radius:8px;padding:12px 14px;text-decoration:none;color:var(--ink);background:var(--accent-soft)}
+.demo .go{color:var(--accent);font-weight:700;font-size:13px}
+.gallery{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+.shot{display:grid;border:1px solid var(--line);border-radius:8px;overflow:hidden;text-decoration:none;color:var(--ink);background:var(--soft)}
+.shot img{width:100%;aspect-ratio:16/10;object-fit:cover;display:block;max-width:100%}
+.shot .noimg{aspect-ratio:16/10;display:grid;place-items:center;color:var(--muted);font-size:13px}
+.shot .cap{display:grid;padding:8px 10px;background:var(--panel)}
+.dlist{display:grid;gap:12px}
+.ditem{display:grid;gap:4px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.ditem:last-child{border-bottom:none;padding-bottom:0}
+.dh{display:flex;gap:8px;align-items:center}
+.drow{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;font-size:13.5px}
+.drow a{color:var(--accent);word-break:break-all}
+.codebox summary{cursor:pointer;padding:10px 14px;color:var(--muted);font-size:13px}
+a.chipbtn{text-decoration:none;color:var(--ink)}
 /* 時間軸 */
 .day{display:grid;gap:6px;padding-bottom:10px}
 .dhd{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.06em;border-bottom:1px solid var(--line);padding-bottom:4px}
@@ -352,13 +376,13 @@ function renderHome(){
 }
 
 /* ================= 專案頁：單一流程 ================= */
-const STEPS = [['collecting','收集'],['organizing','整理'],['drafting','畫圖及規格'],['developing','開發'],['process','共用看過程']];
+const STEPS = [['collecting','收集'],['organizing','整理'],['drafting','畫圖及規格'],['developing','開發'],['process','共用看成果與過程']];
 const STAGE_HINT = {
   collecting:'大家寫下想解決的問題或期望，看到一樣的就按「＋1」。',
   organizing:'把需求歸納成主題，意見不同的地方列為「待決定」。',
   drafting:'把主題畫成流程圖、寫下每一步的驗收標準。每個人都可以點節點提意見，管理者再用 AI 對話把意見整理進去。',
   developing:'規格定稿後由 AI Agent 開發，進度、提問和產出物都在這裡。',
-  process:'從第一則需求到現在，整個專案發生過的事。'
+  process:'「成果」看 AI Agent 做出來的東西；「過程」看從第一則需求到現在發生過的事。'
 };
 function proj(){ return S.projects.find(p=>p.project===S.project)||{}; }
 function phaseIdx(){ return PH_ORDER.indexOf(proj().status); }
@@ -638,14 +662,53 @@ const KIND = {
   dev:['開發','--s-blocked'], answer:['開發','--s-blocked']
 };
 function renderProcess(){
-  if(!S.timeline){ $('tabBody').innerHTML='<p class="loading">讀取中…</p>'; return; }
+  const mode=S.pMode||'out';
+  const sw=`<div class="seg" role="tablist"><button class="segb ${mode==='out'?'on':''}" data-m="out">成果</button><button class="segb ${mode==='log'?'on':''}" data-m="log">過程</button></div>`;
+  if(mode==='out'){ $('tabBody').innerHTML=sw+'<div id="outBody"></div>'; renderOutputs(); }
+  else renderLog(sw);
+  $('tabBody').querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{ S.pMode=b.dataset.m; renderProcess(); });
+}
+const IMG_RE=/\.(png|jpe?g|gif|webp)$/i;
+function driveId(u){ const m=String(u||'').match(/\/d\/([\w-]{10,})|[?&]id=([\w-]{10,})/); return m?(m[1]||m[2]):''; }
+function host(u){ try{ return new URL(u).host.replace(/^www\./,''); }catch(e){ return u; } }
+function renderOutputs(){
+  const box=$('outBody');
+  if(!S.dev){ box.innerHTML=`<div class="card"><div class="in"><p class="empty">規格定稿、AI Agent 開始開發後，做好的東西（可以試用的連結、畫面截圖、測試報告）會出現在這裡。</p></div></div>`; return; }
+  const spec=S.dev.spec, label=id=>{ const n=spec.nodes.find(x=>x.id===id); return n?n.label:(id||'整體'); };
+  const seen=new Set(), arts=[];
+  S.dev.events.slice().reverse().forEach(e=>(e.artifacts||[]).forEach(a=>{ const k=a.url||a.path; if(!k||seen.has(k)) return; seen.add(k); arts.push({...a,node:e.node,ts:e.ts,summary:e.summary}); }));
+  const demos=arts.filter(a=>a.type==='link'), imgs=arts.filter(a=>a.type==='upload'&&IMG_RE.test(a.name||'')), docs=arts.filter(a=>a.type==='upload'&&!IMG_RE.test(a.name||'')), code=arts.filter(a=>a.type==='file');
+  const last={}; S.dev.events.forEach(e=>last[e.node]=e);
+  const done=spec.nodes.filter(n=>last[n.id]&&last[n.id].status==='done'), total=spec.nodes.length;
+  const pct=total?Math.round(done.length/total*100):0;
+  box.innerHTML=`
+    <section class="card"><div class="in">
+      <div class="prog"><div class="pl"><b>${done.length} / ${total}</b> 個步驟完成<span class="who2">　規格 v${S.dev.version}</span></div><div class="bar"><i style="width:${pct}%"></i></div></div>
+    </div></section>
+    ${demos.length?`<section class="card"><h2>可以試用</h2><div class="in demos">${demos.map(a=>`<a class="demo" href="${esc(a.url)}" target="_blank" rel="noopener"><b>${esc(a.name||host(a.url))}</b><span class="who2">${esc(label(a.node))} · ${fmt(a.ts)}</span><span class="go">開啟 ↗</span></a>`).join('')}</div></section>`:''}
+    ${imgs.length?`<section class="card"><h2>畫面</h2><div class="in gallery">${imgs.map(a=>{ const id=driveId(a.url); return `<a class="shot" href="${esc(a.url)}" target="_blank" rel="noopener">
+        ${id?`<img src="https://drive.google.com/thumbnail?id=${esc(id)}&sz=w640" alt="${esc(a.name)}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'noimg',textContent:'點開查看'}))">`:`<span class="noimg">點開查看</span>`}
+        <span class="cap"><b>${esc(label(a.node))}</b><span class="who2">${esc(a.name)} · ${fmt(a.ts)}</span></span></a>`; }).join('')}</div></section>`:''}
+    <section class="card"><h2>完成了什麼</h2><div class="in">${done.length?`<div class="dlist">${done.map(n=>{ const e=last[n.id]; const na=arts.filter(a=>a.node===n.id&&a.type!=='file');
+        return `<div class="ditem"><div class="dh"><i class="dot" style="background:var(--s-done)"></i><b>${esc(n.label)}</b><span class="who2">${fmt(e.ts)}</span></div>
+        ${e.summary?`<div>${esc(e.summary)}</div>`:''}
+        ${n.acceptance&&n.acceptance.length?`<div class="hint">驗收標準 ${n.acceptance.length} 條：${n.acceptance.map(a=>esc(a.text)).join('；')}</div>`:''}
+        ${na.length?`<div class="chips">${na.map(a=>`<a class="chipbtn" href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.name||host(a.url))}</a>`).join('')}</div>`:''}</div>`; }).join('')}</div>`:'<p class="empty">還沒有完成的步驟。</p>'}
+      ${spec.nodes.length>done.length?`<p class="hint">未完成：${spec.nodes.filter(n=>!done.includes(n)).map(n=>esc(n.label)+'（'+((ST[(last[n.id]||{}).status]||ST.todo).zh)+'）').join('、')}</p>`:''}</div></section>
+    ${docs.length?`<section class="card"><h2>報告與文件</h2><div class="in">${docs.map(a=>`<div class="drow"><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.name)}</a><span class="who2">${esc(label(a.node))} · ${fmt(a.ts)}</span></div>`).join('')}</div></section>`:''}
+    ${code.length?`<details class="card codebox"><summary>程式碼（${code.length} 個檔案，給工程人員看）</summary><div class="in">${code.map(a=>`<div class="drow">${a.url?`<a class="path" href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.path)}</a>`:`<span class="path">${esc(a.path)}</span>`}<span class="who2">${esc(label(a.node))} · ${fmt(a.ts)}</span></div>`).join('')}</div></details>`:''}
+    ${!demos.length&&!imgs.length&&!docs.length?`<p class="hint">AI Agent 還沒有上傳可以看的成果。可以在「開發」階段請它附上畫面截圖或試用連結。</p>`:''}`;
+}
+function renderLog(sw){
+  if(!S.timeline){ $('tabBody').innerHTML=sw+'<p class="loading">讀取中…</p>'; return; }
   const groups=['全部','收集','整理','規格','開發','專案'], f=S.pFilter||'全部';
   const items=S.timeline.filter(i=>f==='全部'||(KIND[i.kind]||['專案'])[0]===f).slice().reverse();
   const byDay={}; items.forEach(i=>{ const d=new Date(i.ts); const k=isNaN(d)?'':`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`; (byDay[k]=byDay[k]||[]).push(i); });
-  $('tabBody').innerHTML=`<div class="chips" style="margin-bottom:12px">${groups.map(g=>`<button class="chipbtn ${g===f?'on':''}" data-g="${g}">${g}${g==='全部'?'':` · ${S.timeline.filter(i=>(KIND[i.kind]||['專案'])[0]===g).length}`}</button>`).join('')}</div>
+  $('tabBody').innerHTML=sw+`<div class="chips" style="margin-bottom:12px">${groups.map(g=>`<button class="chipbtn ${g===f?'on':''}" data-g="${g}">${g}${g==='全部'?'':` · ${S.timeline.filter(i=>(KIND[i.kind]||['專案'])[0]===g).length}`}</button>`).join('')}</div>
     <section class="card"><div class="in">${items.length?Object.entries(byDay).map(([d,l])=>`<div class="day"><div class="dhd">${esc(d)}</div>${l.map(i=>{ const k=KIND[i.kind]||['專案','--accent'];
       return `<div class="tli"><span class="t">${fmt(i.ts).slice(6)}</span><i class="dot" style="background:var(${k[1]})"></i><div><span class="tag">${k[0]}</span> <b>${esc(who(i.actor))}</b> ${esc(i.text)}</div></div>`; }).join('')}</div>`).join(''):'<p class="empty">還沒有任何紀錄。</p>'}</div></section>`;
   $('tabBody').querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{ S.pFilter=b.dataset.g; renderProcess(); });
+  $('tabBody').querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{ S.pMode=b.dataset.m; renderProcess(); });
 }
 
 /* ---------- 流程圖（共用） ---------- */

@@ -5,7 +5,7 @@
  *   flow init --endpoint <網址> --project <名稱> [--token T] [--repo https://github.com/你/專案]
  *   flow pull [--version N]                      拉取規格到 .flow/
  *   flow push-spec [spec.json]                   發布新版規格（平台介面完成前用）
- *   flow report --node ID --status S --summary "…" [--file 路徑]… [--upload 路徑]… [--link 網址]…
+ *   flow report --node ID --status S --summary "…" [--file 路徑]… [--upload 路徑]… [--link "名稱|網址"]…
  *   flow ask --node ID "問題"
  *   flow answers [--all]                         讀取同事的回覆
  *   flow status                                  各節點目前狀態
@@ -209,7 +209,10 @@ const commands = {
       artifacts.push({ type: 'file', path: rel, ...(c.repoUrl && head ? { url: `${c.repoUrl.replace(/\/$/, '')}/blob/${head}/${rel}` } : {}) });
       rememberFile(f, a.node);
     }
-    for (const u of list(a.link)) artifacts.push({ type: 'link', url: u });
+    for (const u of list(a.link)) {   // --link "名稱|網址" 或只給網址
+      const i = String(u).lastIndexOf('|http');
+      artifacts.push(i > 0 ? { type: 'link', name: String(u).slice(0, i).trim(), url: String(u).slice(i + 1).trim() } : { type: 'link', url: u });
+    }
     for (const f of list(a.upload)) {
       if (!fs.existsSync(f)) die('找不到檔案 ' + f);
       const buf = fs.readFileSync(f);

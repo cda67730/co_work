@@ -34,6 +34,24 @@ node flow.mjs report --node rules_kb --status blocked --summary "缺少園務規
 
 summary 會顯示給不寫程式的同事看，請用白話寫結果，不要寫技術細節。
 
+## 成果（同事最在意的部分）
+
+平台的「成果」頁會把你上傳的東西整理給同事看。每個步驟回報 `done` 時，**至少附上一樣同事看得懂的成果**：
+
+- **可以試用的連結**：`--link "家長提問小幫手（測試版）|https://…"`，名稱寫同事看得懂的
+- **畫面截圖**：`--upload screenshots/classify.png`（png、jpg 會直接顯示成縮圖）
+- **測試報告**：`--upload reports/classify-test.md`，寫明每條驗收標準的結果（通過／未通過、測了什麼例子）
+
+程式檔用 `--file`，只給工程人員看，同事不會特別去點。
+
+```bash
+node flow.mjs report --node classify --status done \
+  --summary "驗收 3 條全數通過；20 題測試正確 18 題，錯的 2 題已列在報告" \
+  --file src/classify.js \
+  --upload screenshots/classify.png --upload reports/classify-test.md \
+  --link "分類測試頁|https://script.google.com/macros/s/…/exec"
+```
+
 ## 提問
 
 只有**需要業務判斷**的問題才提問，技術問題請自己決定，並寫在 commit 訊息裡。
