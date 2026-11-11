@@ -247,6 +247,10 @@ textarea.code{font-family:var(--mono);font-size:12.5px;min-height:360px;line-hei
 .vinfo{flex:1;min-width:0;font-size:13px}
 .busy{position:fixed;inset:0;background:color-mix(in srgb,var(--bg) 70%,transparent);display:flex;align-items:center;justify-content:center;z-index:30}
 .busy .card{padding:18px 22px;display:flex;gap:10px;align-items:center}
+.keyhelp{border:1px solid var(--s-review);border-left-width:4px;border-radius:6px;background:var(--panel);padding:10px 14px;font-size:13px;margin-bottom:14px}
+.keyhelp ol{margin:6px 0 0;padding-left:20px;display:grid;gap:2px}
+.keyhelp code{font-family:var(--mono);background:var(--soft);padding:0 4px;border-radius:3px}
+.mini .tag{justify-self:start}
 /* 成果 */
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:12px;background:var(--panel)}
 .segb{border:none;background:none;padding:6px 18px;cursor:pointer;color:var(--muted)}
@@ -446,7 +450,12 @@ function stageActions(){
 function bindStageActions(){
   $('view').querySelectorAll('[data-phase]').forEach(b=>b.onclick=async()=>{
     const r=await act(b,'pageSetPhase',S.project,b.dataset.phase).catch(()=>null); if(!r) return;
-    S.plan=r; proj().status=b.dataset.phase; S.view=b.dataset.phase; S.timeline=null; renderProject(); toast('進入「'+PH[b.dataset.phase]+'」'); });
+    S.plan=r; proj().status=b.dataset.phase; S.view=b.dataset.phase; S.timeline=null; renderProject(); toast('進入「'+PH[b.dataset.phase]+'」');
+    // 進入整理／畫圖時自動請 AI 開始（已經有內容就不重跑，避免蓋掉）
+    if(!r.aiReady) return;
+    const hasThemes=(r.themes||[]).some(t=>(t.needIds||[]).length||t.summary), d=parseLoose(r.draft||'');
+    if(b.dataset.phase==='organizing'&&!hasThemes&&roundNeeds(curRound()).length) aiThemesRun('');
+    if(b.dataset.phase==='drafting'&&!(d&&d.nodes&&d.nodes.length)) aiSpecRun(); });
   const nr=$('nextRound'); if(nr) nr.onclick=async()=>{
     if(nr.dataset.armed!=='1'){ nr.dataset.armed='1'; nr.textContent='再按一次：回到收集（開發進度會保留）'; return; }
     const r=await act(nr,'pageNextRound',S.project).catch(()=>null); if(!r) return;
@@ -462,11 +471,12 @@ function renderThemes(){
   const edit=canEdit('organizing'), themes=S.plan.themes, needs=roundNeeds(curRound());
   const nmap=Object.fromEntries(S.plan.needs.map(n=>[n.id,n]));
   const unassigned=needs.filter(n=>!themeOf(n.id));
+  const ok=S.plan.aiReady, realThemes=themes.filter(t=>(t.needIds||[]).length||t.summary);
   const aiBar = edit ? `<div class="aibar">
-      ${themes.length?`<button class="btn primary" id="openThemeChat">與 AI 對話修改主題</button>`:`<button class="btn primary" id="aiThemes" ${needs.length?'':'disabled'}>AI 整理 ${needs.length} 則需求</button>`}
+      <button class="btn ${realThemes.length?'':'primary'}" id="aiThemes" ${needs.length&&ok?'':'disabled'}>${realThemes.length?'AI 重新整理全部需求':`AI 整理 ${needs.length} 則需求`}</button>
+      ${realThemes.length?`<button class="btn primary" id="openThemeChat" ${ok?'':'disabled'}>與 AI 對話修改主題</button>`:''}
       <button class="btn" id="addTheme">手動新增主題</button>
-      ${S.plan.aiReady?'':`<span class="hint warnc">還沒設定 Gemini API key，AI 功能無法使用。</span>`}
-    </div>` : '';
+    </div>${ok?'':keyHelp()}` : '';
   $('tabBody').innerHTML=`${aiBar}<div class="two">
     <div class="list">
       ${themes.length?themes.map((t,i)=>`<article class="theme">
@@ -489,7 +499,9 @@ function renderThemes(){
       <div class="in list">${needs.length?needs.slice().sort((a,b)=>b.plus.length-a.plus.length).map(n=>`<div class="mini ${themeOf(n.id)?'':'un'}"><b>${esc(n.topic)}</b>${n.plus.length?` <span class="who2">+${n.plus.length}</span>`:''}<div class="hint">${esc(n.pain||n.want)}</div>${themeOf(n.id)?'':`<span class="tag">未歸類</span>`}</div>`).join(''):'<p class="empty">這一輪沒有需求。</p>'}</div>
     </section></div>`;
   if(!edit) return;
-  const ai=$('aiThemes'); if(ai) ai.onclick=async()=>{ busy(true,'AI 正在整理需求…'); try{ S.plan=await run('pageThemesChat',S.project,''); renderProject(); toast(`整理出 ${S.plan.themes.length} 個主題`); }catch(e){ toast(e.message||'AI 整理失敗'); } busy(false); };
+  const ai=$('aiThemes'); if(ai) ai.onclick=async()=>{
+    if(realThemes.length&&ai.dataset.armed!=='1'){ ai.dataset.armed='1'; ai.textContent='再按一次：重新整理（填過的決定會保留）'; return; }
+    await aiThemesRun(realThemes.length?'請依目前全部需求重新整理主題，保留已填的決定。':''); };
   const oc=$('openThemeChat'); if(oc) oc.onclick=()=>openChat('themes');
   $('addTheme').onclick=async e=>{ const list=themes.concat([{id:'t'+Date.now().toString(36),title:'新主題',summary:'',needIds:[],conflict:'',decision:''}]);
     const r=await act(e.target,'pageSaveThemes',S.project,list).catch(()=>null); if(r){ S.plan=r; renderProject(); const el=$('te_'+(r.themes.length-1)); if(el){ el.hidden=false; el.querySelector('input').focus(); } } };
@@ -514,9 +526,9 @@ function renderSpec(){
   if(!spec||!spec.nodes||!spec.nodes.length){
     $('tabBody').innerHTML=`<div class="card hero"><div class="in">
       <p class="empty">${edit?'還沒有流程圖。AI 會依照主題、決定事項和需求，畫出初版流程與每一步的驗收標準。':'管理者產生流程圖後，會出現在這裡，到時可以點每個步驟提意見。'}</p>
-      ${edit?`<div><button class="btn primary" id="aiSpec" ${S.plan.aiReady?'':'disabled'}>AI 畫出初版流程圖</button></div>${S.plan.aiReady?'':'<p class="hint warnc">還沒設定 Gemini API key，AI 功能無法使用。</p>'}`:''}
+      ${edit?`<div><button class="btn primary" id="aiSpec" ${S.plan.aiReady?'':'disabled'}>AI 畫出初版流程圖</button></div>${S.plan.aiReady?'':keyHelp()}`:''}
     </div></div>`;
-    const b=$('aiSpec'); if(b) b.onclick=async()=>{ busy(true,'AI 正在畫流程圖、寫驗收標準…（約 20–60 秒）'); try{ S.plan=await run('pageSpecChat',S.project,'',false); renderProject(); toast('初版流程圖完成'); }catch(e){ toast(e.message||'AI 產生失敗'); } busy(false); };
+    const b=$('aiSpec'); if(b) b.onclick=()=>aiSpecRun();
     return;
   }
   const info=id=>{ const n=spec.nodes.find(x=>x.id===id), c=cur?openComments(id).length:0; return {sub:(TYPE_ZH[n.type]||n.type)+(n.locked&&cur?' · 已鎖定':''), q:c?`${c} 則意見`:''}; };
@@ -525,7 +537,7 @@ function renderSpec(){
     ${cur?`<div class="aibar">
       <span class="ver">草稿 v${lastDraft?lastDraft.v:1}</span><span class="hint">${lastDraft?esc(fmt(lastDraft.ts)+' · '+who(lastDraft.by)+'：'+lastDraft.note):''}</span>
       <span class="sp"></span>
-      ${edit?`<button class="btn" id="openVers">版本紀錄</button><button class="btn primary" id="openSpecChat">AI 對話整理意見${nOpen?`<span class="badge">${nOpen}</span>`:''}</button>`:''}
+      ${edit?`<button class="btn" id="openVers">版本紀錄</button><button class="btn primary" id="openSpecChat" ${S.plan.aiReady?'':'disabled'}>AI 對話整理意見${nOpen?`<span class="badge">${nOpen}</span>`:''}</button>`:''}
     </div>`:''}
     <div class="two">
       <div class="list">
@@ -652,6 +664,9 @@ function openVersions(){
     if(b.dataset.armed!=='1'){ b.dataset.armed='1'; b.textContent='再按一次確定'; return; }
     const r=await act(b,'pageRestoreDraft',S.project,+b.dataset.restore).catch(()=>null); if(r){ S.plan=r; closeModal(); renderProject(); toast(`已退回 v${b.dataset.restore}（存成新版本）`); } });
 }
+function keyHelp(){ return `<div class="keyhelp"><b>AI 功能還不能用：還沒設定 Gemini API key</b><ol><li>到 Google AI Studio（aistudio.google.com）建立 API key</li><li>Apps Script 左側「專案設定」→ 最下方「指令碼屬性」→ 新增屬性 <code>GEMINI_API_KEY</code>，值貼上 key → 儲存</li><li>回到這裡按「重新整理」，不用重新部署</li></ol></div>`; }
+async function aiThemesRun(msg){ busy(true,'AI 正在整理需求…（約 10–30 秒）'); try{ S.plan=await run('pageThemesChat',S.project,msg||''); renderProject(); toast(`整理出 ${S.plan.themes.length} 個主題`); }catch(e){ renderProject(); toast(e.message||'AI 整理失敗'); } busy(false); }
+async function aiSpecRun(){ busy(true,'AI 正在畫流程圖、寫驗收標準…（約 20–60 秒）'); try{ S.plan=await run('pageSpecChat',S.project,'',false); renderProject(); toast('初版流程圖完成'); }catch(e){ renderProject(); toast(e.message||'AI 產生失敗'); } busy(false); }
 function busy(on,msg){ const o=$('busy'); o.hidden=!on; if(on) $('busyMsg').textContent=msg||'處理中…'; }
 
 /* ---------- ⑤ 共用看過程 ---------- */
