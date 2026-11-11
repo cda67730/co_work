@@ -27,6 +27,7 @@ const SHEETS = {
   comments:  ['id', 'ts', 'project', 'round', 'node', 'author', 'text', 'status', 'note'],
   activity:  ['ts', 'project', 'actor', 'kind', 'text'],
 };
+const BACKEND_VERSION = 7;   // 和 Page.html 的 EXPECT_BACKEND 對應，不一致時頁面會提醒
 const PHASES = ['collecting', 'organizing', 'drafting', 'developing'];
 const STATUSES = ['todo', 'working', 'done', 'blocked', 'needs_review'];
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -105,7 +106,7 @@ function pageProjects() {
       list.push({ project: r.project, title: r.title, purpose: '', due: '', status: 'developing', round: 1, version: Number(r.version), needs: 0, external: true });
     }
   });
-  return { user: user, isOwner: isOwner_(user), projects: list };
+  return { user: user, isOwner: isOwner_(user), projects: list, backend: BACKEND_VERSION };
 }
 
 function pageCreateProject(p) {
@@ -187,6 +188,7 @@ function pagePlanning(project) {
     chats: rows_('chats').filter(inRound).map(r => ({ ts: r.ts, stage: r.stage, role: r.role, author: r.author, text: r.text, log: parse_(r.log, []) })),
     comments: rows_('comments').filter(inRound).map(r => ({ id: r.id, ts: r.ts, node: r.node, author: r.author, text: r.text, status: r.status, note: r.note })),
     aiReady: !!PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY'),
+    backend: BACKEND_VERSION,
   };
 }
 
@@ -286,11 +288,25 @@ function gemini_(kind, system, user, schema) {
   const c = body.candidates && body.candidates[0];
   const text = c && c.content && c.content.parts ? c.content.parts.filter(x => !x.thought).map(x => x.text || '').join('') : '';
   const out = parse_(text.replace(/^```(?:json)?\s*|\s*```$/g, ''), null);
-  if (!out) throw new Error('AI 回覆的格式不正確，請再試一次。');
+  if (!out) { console.log('Gemini 原始回覆：' + text.slice(0, 2000)); throw new Error('AI 回覆的格式不正確（' + (c && c.finishReason || '未知原因') + '），請再試一次。'); }
   return out;
 }
 
 const NODE_TYPES = ['input', 'llm', 'retrieve', 'condition', 'tool', 'output'];
+
+/** 診斷用：在 Apps Script 編輯器選這個函式按「執行」，到「執行紀錄」看結果 */
+function testGemini() {
+  const props = PropertiesService.getScriptProperties();
+  Logger.log('GEMINI_API_KEY：' + (props.getProperty('GEMINI_API_KEY') ? '已設定' : '沒有設定'));
+  Logger.log('後端版本：' + BACKEND_VERSION);
+  ['fast', 'spec'].forEach(kind => {
+    try {
+      const out = gemini_(kind, '你是測試助手。', '用一句繁體中文打招呼，並給 2 個水果名稱。',
+        { type: 'OBJECT', properties: { reply: { type: 'STRING' }, fruits: { type: 'ARRAY', items: { type: 'STRING' } } }, required: ['reply', 'fruits'] });
+      Logger.log(kind + ' 模型 OK：' + JSON.stringify(out));
+    } catch (err) { Logger.log(kind + ' 模型失敗：' + err.message); }
+  });
+}
 
 /* Gemini 回覆結構（responseSchema），避免 AI 自由發揮格式或抄回範本 */
 const STR = { type: 'STRING' }, STRS = { type: 'ARRAY', items: { type: 'STRING' } };
